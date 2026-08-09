@@ -1,3 +1,5 @@
+
+
 # 蚂蚁影视
 
 跨平台影音娱乐应用，支持 Android、iOS、macOS、Windows。
@@ -46,4 +48,4 @@
 - 支持 `imageStyle` 的文本占位兼容，以及分页图片相对路径按当前页解析
 - 详情页与阅读页之间复用已加载章节列表，并为传统书源目录增加会话级缓存，避免重复整本解析
 
-关注频道：https://t.me/ant_video
+关注频道：[Ant Video](https://t.me/ant_video)
