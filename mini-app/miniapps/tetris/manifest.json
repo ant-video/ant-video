@@ -1,0 +1,10 @@
+{
+  "appId": "com.leospring.tetris",
+  "name": "俄罗斯方块",
+  "version": "1.0.0",
+  "versionCode": 1,
+  "renderer": "webview",
+  "entry": "index.html",
+  "description": "复刻小时候的掌上游戏机，带音效与光影",
+  "permissions": ["ui", "storage", "navigate"]
+}

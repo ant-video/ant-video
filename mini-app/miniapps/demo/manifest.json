@@ -1,0 +1,13 @@
+{
+  "appId": "com.leospring.demo",
+  "name": "示例小程序",
+  "version": "1.0.0",
+  "versionCode": 1,
+  "renderer": "webview",
+  "entry": "index.html",
+  "description": "演示 ant.* 全部 JSAPI 的内置示例，可作为开发模板",
+  "permissions": ["network", "storage", "ui", "navigate", "player", "source"],
+  "network": {
+    "allowlist": ["*"]
+  }
+}

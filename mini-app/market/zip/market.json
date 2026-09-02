@@ -1,0 +1,31 @@
+{
+  "apps": [
+    {
+      "appId": "com.leospring.emby",
+      "name": "影视库",
+      "version": "1.0.0",
+      "versionCode": 1,
+      "url": "https://ghfast.top/https://raw.githubusercontent.com/ant-video/ant-video/refs/heads/main/mini-app/market/zip/emby.zip",
+      "author": "leospring",
+      "description": "Emby 风格的影视浏览器：复用宿主已配置的采集源，支持首页推荐、分类浏览、搜索、详情选集与续播"
+    },
+    {
+      "appId": "com.leospring.demo",
+      "name": "示例小程序",
+      "version": "1.0.0",
+      "versionCode": 1,
+      "url": "https://ghfast.top/https://raw.githubusercontent.com/ant-video/ant-video/refs/heads/main/mini-app/market/zip/demo.zip",
+      "author": "leospring",
+      "description": "演示 ant.* 全部 JSAPI 的内置示例，可作为开发模板"
+    },
+    {
+      "appId": "com.leospring.tetris",
+      "name": "俄罗斯方块",
+      "version": "1.0.0",
+      "versionCode": 1,
+      "url": "https://ghfast.top/https://raw.githubusercontent.com/ant-video/ant-video/refs/heads/main/mini-app/market/zip/tetris-v1.zip",
+      "author": "leospring",
+      "description": "复刻小时候的掌上游戏机，带音效与光影"
+    }
+  ]
+}

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>详情</title>
+  <link rel="stylesheet" href="theme.css" />
+</head>
+<body>
+  <header id="app-header"></header>
+  <main id="app-main">
+    <div id="detail"></div>
+    <div id="episodes"></div>
+  </main>
+
+  <script src="lib.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var U = window.EmbyUI;
+
+      var box = document.getElementById('detail');
+      var epBox = document.getElementById('episodes');
+      var state = { siteKey: '', vod: null, lines: [], lineIndex: 0, last: null };
+
+      function skeletonHead() {
+        return '<div class="detail-top"><div class="detail-head">' +
+          '<div class="sk detail-poster"></div>' +
+          '<div class="detail-info" style="flex:1">' +
+          '<div class="sk sk-line" style="width:60%;height:22px"></div>' +
+          '<div class="sk sk-line" style="width:40%"></div>' +
+          '<div class="sk sk-line" style="width:90%"></div>' +
+          '<div class="sk sk-line" style="width:80%"></div>' +
+          '</div></div></div>';
+      }
+
+      function skeletonEpisodes() {
+        var cell = '<div class="sk" style="height:41px"></div>';
+        var cells = '';
+        for (var i = 0; i < 8; i++) cells += cell;
+        return '<div class="ep-grid">' + cells + '</div>';
+      }
+
+      function paintHead(vod, resuming) {
+        var pic = vod.vod_pic || '';
+        var pills = [vod.vod_year, vod.vod_area, vod.vod_lang, vod.vod_type]
+          .filter(Boolean)
+          .map(function (t) { return '<span class="pill">' + U.esc(t) + '</span>'; })
+          .join('');
+        if (vod.vod_remarks) {
+          pills += '<span class="pill accent">' + U.esc(vod.vod_remarks) + '</span>';
+        }
+
+        var overview = (vod.vod_content || '').replace(/<[^>]+>/g, '').trim();
+        var kv = '';
+        if (vod.vod_actor) kv += '<div><b>主演</b>' + U.esc(vod.vod_actor) + '</div>';
+        if (vod.vod_director) kv += '<div><b>导演</b>' + U.esc(vod.vod_director) + '</div>';
+
+        var resumeText = resuming
+          ? '▶ 续播 · ' + U.esc(resuming.name)
+          : '▶ 播放';
+
+        box.innerHTML =
+          '<div class="detail-top">' +
+          (pic
+            ? '<div class="detail-bg" style="background-image:url(' + U.esc(pic) + ')"></div>'
+            : '<div class="detail-bg" style="background:linear-gradient(135deg,#2a2a30,#141417)"></div>') +
+          '<div class="detail-head">' +
+          '<div class="detail-poster">' +
+          (pic ? '<img src="' + U.esc(pic) + '" alt=""/>' : '') +
+          '</div>' +
+          '<div class="detail-info">' +
+          '<h1>' + U.esc(vod.vod_name || '未命名') + '</h1>' +
+          (pills ? '<div class="meta">' + pills + '</div>' : '') +
+          '<div class="btn-row">' +
+          '<button data-focus class="btn primary" id="btn-play">' + resumeText + '</button>' +
+          '</div>' +
+          (kv ? '<div class="kv">' + kv + '</div>' : '') +
+          '</div></div>' +
+          (overview
+            ? '<p class="overview clamp" id="ov">' + U.esc(overview) + '</p>' +
+              '<button data-focus class="overview-toggle" id="ov-toggle">展开简介</button>'
+            : '') +
+          '</div>';
+
+        var toggle = document.getElementById('ov-toggle');
+        if (toggle) {
+          toggle.addEventListener('click', function () {
+            var ov = document.getElementById('ov');
+            var clamped = ov.classList.toggle('clamp');
+            toggle.textContent = clamped ? '展开简介' : '收起';
+          });
+        }
+
+        document.getElementById('btn-play').addEventListener('click', function () {
+          var line = state.lines[state.lineIndex];
+          if (!line) { U.toast('没有可播放的线路'); return; }
+          var episode = line.episodes[0];
+          if (resuming) {
+            var hit = line.episodes.filter(function (e) { return e.id === resuming.id; })[0];
+            if (hit) episode = hit;
+          }
+          play(episode);
+        });
+      }
+
+      function paintEpisodes() {
+        if (!state.lines.length) {
+          epBox.innerHTML = '<div class="hint" style="padding:20px 16px">' +
+            '这个条目没有返回可播放的线路。</div>';
+          return;
+        }
+
+        var line = state.lines[state.lineIndex];
+        var lastId = state.last ? state.last.id : null;
+
+        epBox.innerHTML =
+          '<div class="section-head" style="padding-top:6px"><h2>选集</h2>' +
+          '<span class="more">' + line.episodes.length + ' 集</span></div>' +
+          (state.lines.length > 1
+            ? '<div class="chips scroll" id="lines">' +
+              state.lines.map(function (l, i) {
+                return '<button data-focus class="chip ' +
+                  (i === state.lineIndex ? 'on' : '') + '" data-line="' + i + '">' +
+                  U.esc(l.name) + '</button>';
+              }).join('') + '</div>'
+            : '') +
+          '<div class="ep-grid" id="eps">' +
+          line.episodes.map(function (e, i) {
+            var on = lastId && e.id === lastId ? ' played' : '';
+            return '<button data-focus class="ep' + on + '" data-ep="' + i + '">' +
+              U.esc(e.name) + '</button>';
+          }).join('') +
+          '</div>';
+
+        var lines = document.getElementById('lines');
+        if (lines) {
+          lines.querySelectorAll('[data-line]').forEach(function (node) {
+            node.addEventListener('click', function () {
+              state.lineIndex = Number(node.dataset.line);
+              paintEpisodes();
+            });
+          });
+        }
+
+        document.getElementById('eps').querySelectorAll('[data-ep]').forEach(function (node) {
+          node.addEventListener('click', function () {
+            play(line.episodes[Number(node.dataset.ep)]);
+          });
+        });
+      }
+
+      function play(episode) {
+        var line = state.lines[state.lineIndex];
+        U.playEpisode(state.siteKey, state.vod, line, episode)
+          .then(function () {
+            state.last = { line: line.name, name: episode.name, id: episode.id };
+            paintEpisodes();
+          })
+          .catch(function () { /* playEpisode 内部已提示 */ });
+      }
+
+      function load(siteKey, id, summary) {
+        state.siteKey = siteKey;
+        if (summary) paintHead(summary, null); else box.innerHTML = skeletonHead();
+        epBox.innerHTML = skeletonEpisodes();
+
+        return ant.source.detail({ siteKey: siteKey, id: id })
+          .then(function (full) {
+            var vod = full && full.vod_name ? full : (summary || {});
+            state.vod = vod;
+            state.lines = U.parseLines(full && full.vod_play_url ? full : vod);
+
+            return U.getLastEp(siteKey, String(vod.vod_id || id)).then(function (last) {
+              state.last = last;
+              if (last) {
+                for (var i = 0; i < state.lines.length; i++) {
+                  if (state.lines[i].name === last.line) { state.lineIndex = i; break; }
+                }
+              }
+              paintHead(vod, last);
+              paintEpisodes();
+              return U.pushHistory(siteKey, vod);
+            });
+          })
+          .catch(function (e) {
+            box.innerHTML = U.stateHtml('⚠️', '详情加载失败', U.esc(U.errText(e)));
+            epBox.innerHTML = '';
+          });
+      }
+
+      U.boot({ active: '' }).then(function (ok) {
+        if (!ok) return;
+        var id = U.qs('id');
+        ant.storage.getJSON('nav.detail', null).then(function (nav) {
+          var siteKey = (nav && nav.siteKey) || window.App.site.key;
+          var summary = nav && nav.vod ? nav.vod : null;
+          var target = id || (summary && summary.vod_id);
+          if (!target) {
+            box.innerHTML = U.stateHtml('🤔', '没有指定条目', '回首页挑一个吧。');
+            return;
+          }
+          // 摘要与 URL 的 id 不一致时（比如从历史里点进来），以 URL 为准
+          if (summary && String(summary.vod_id) !== String(target)) summary = null;
+          load(siteKey, target, summary);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

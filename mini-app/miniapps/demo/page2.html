@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>第二页</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>第二页</h1>
+    <p>由 ant.navigateTo('page2.html') 打开，SDK 依然可用。</p>
+  </header>
+
+  <section>
+    <div class="grid">
+      <button id="back">ant.navigateBack()</button>
+      <button id="toast">在这一页弹 Toast</button>
+    </div>
+  </section>
+
+  <script>
+    document.getElementById('back').addEventListener('click', function () {
+      ant.navigateBack();
+    });
+    document.getElementById('toast').addEventListener('click', function () {
+      ant.ui.toast('第二页的 Toast');
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>媒体库</title>
+  <link rel="stylesheet" href="theme.css" />
+</head>
+<body>
+  <header id="app-header"></header>
+  <main id="app-main">
+    <div id="cats" class="chips scroll" style="padding-top:12px"></div>
+    <div id="grid" class="grid"></div>
+    <div id="more" class="loading-more"></div>
+  </main>
+
+  <script src="lib.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var U = window.EmbyUI;
+
+      var catsBox = document.getElementById('cats');
+      var grid = document.getElementById('grid');
+      var moreBox = document.getElementById('more');
+
+      var state = {
+        siteKey: '',
+        classes: [],
+        tid: '',
+        page: 1,
+        pageCount: 999,
+        list: [],
+        loading: false,
+        done: false
+      };
+
+      function paintCats() {
+        catsBox.innerHTML = state.classes.map(function (c) {
+          return '<button data-focus class="chip ' +
+            (String(c.type_id) === String(state.tid) ? 'on' : '') +
+            '" data-tid="' + U.esc(c.type_id) + '">' +
+            U.esc(c.type_name || c.type_id) + '</button>';
+        }).join('');
+
+        catsBox.querySelectorAll('[data-tid]').forEach(function (node) {
+          node.addEventListener('click', function () {
+            if (node.dataset.tid === String(state.tid)) return;
+            state.tid = node.dataset.tid;
+            reset();
+            paintCats();
+            loadMore();
+          });
+        });
+      }
+
+      function reset() {
+        state.page = 1;
+        state.pageCount = 999;
+        state.list = [];
+        state.done = false;
+        grid.innerHTML = '';
+        moreBox.textContent = '';
+      }
+
+      function paintList() {
+        U.renderCards(grid, state.list, { empty: '这个分类没有内容' });
+      }
+
+      function loadMore() {
+        if (state.loading || state.done) return;
+        state.loading = true;
+        moreBox.textContent = state.page === 1 ? '' : '加载中…';
+        if (state.page === 1) {
+          grid.innerHTML = U.skeleton(12, null);
+        }
+
+        ant.source
+          .category({ siteKey: state.siteKey, tid: state.tid, page: state.page })
+          .then(function (res) {
+            var list = (res && res.list) || [];
+            var pageCount = Number(res && (res.size || res.pagecount));
+            if (pageCount > 0) state.pageCount = pageCount;
+
+            if (state.page === 1) state.list = [];
+            state.list = state.list.concat(list);
+            paintList();
+
+            if (!list.length || state.page >= state.pageCount) {
+              state.done = true;
+              moreBox.textContent = state.list.length ? '没有更多了' : '';
+            } else {
+              state.page += 1;
+              moreBox.textContent = '';
+            }
+          })
+          .catch(function (e) {
+            if (state.page === 1) {
+              grid.innerHTML = '';
+              moreBox.innerHTML = U.stateHtml('⚠️', '加载失败', U.esc(U.errText(e)));
+            } else {
+              moreBox.textContent = '加载失败：' + U.errText(e);
+            }
+            state.done = true;
+          })
+          .then(function () { state.loading = false; });
+      }
+
+      window.addEventListener('scroll', function () {
+        var bottom = document.documentElement.scrollHeight - window.innerHeight;
+        if (window.scrollY > bottom - 480) loadMore();
+      }, { passive: true });
+
+      U.boot({ active: 'library' }).then(function (ok) {
+        if (!ok) return;
+        state.siteKey = window.App.site.key;
+        state.tid = U.qs('tid');
+
+        catsBox.innerHTML = '<span class="hint">分类加载中…</span>';
+        ant.source.home(state.siteKey).then(function (home) {
+          state.classes = ((home && home.classes) || []).filter(function (c) {
+            return c && c.type_id;
+          });
+          if (!state.classes.length) {
+            catsBox.innerHTML = '';
+            grid.innerHTML = '';
+            moreBox.innerHTML = U.stateHtml('📂', '这个源没有返回分类',
+              '换一个采集源，或直接用搜索。');
+            return;
+          }
+          var known = state.classes.some(function (c) {
+            return String(c.type_id) === String(state.tid);
+          });
+          if (!known) state.tid = String(state.classes[0].type_id);
+          paintCats();
+          loadMore();
+        }).catch(function (e) {
+          catsBox.innerHTML = '';
+          moreBox.innerHTML = U.stateHtml('⚠️', '分类加载失败', U.esc(U.errText(e)));
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,536 @@
+/*!
+ * 俄罗斯方块 —— 掌上游戏机外壳样式。
+ *
+ * 整机按固定设计尺寸 360×700 绘制（.machine），由 app.js 用 transform: scale
+ * 适配任意屏幕，所以这里的所有尺寸都是设计稿绝对值，不需要媒体查询。
+ */
+
+:root {
+  /* 外壳塑料 */
+  --shell-hi: #eee9de;
+  --shell: #d8d1c2;
+  --shell-lo: #b9b1a0;
+  --shell-line: #9b9382;
+  --ink-print: #6b6353;
+  /* 屏幕框 */
+  --bezel-hi: #3a3835;
+  --bezel: #22211f;
+  --bezel-lo: #0d0c0b;
+  /* LCD（背光开关会切换到 .lit 那一组） */
+  --lcd-bg: #97a878;
+  --lcd-edge: #7f8f62;
+  --lcd-glow: transparent;
+  /* 按键 */
+  --key: #75716a;
+  --key-hi: #928d84;
+  --key-lo: #514e49;
+  --red: #c33a30;
+  --red-hi: #e2564a;
+  --red-lo: #8d251d;
+  --blue: #3a5f9e;
+  --blue-hi: #5480c4;
+  --blue-lo: #26406e;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  /* 容器 WebView 是透明的，必须自己铺底，否则会透出宿主壁纸 */
+  background:
+    radial-gradient(120% 80% at 50% 12%, #2c2a26 0%, #171613 55%, #0b0a09 100%),
+    #0b0a09;
+  color: #e8e3d8;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans SC',
+               'Microsoft YaHei', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+/* ══ 舞台与整机 ══════════════════════════════════════════ */
+
+.stage {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+           env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.machine {
+  position: relative;
+  width: 360px;
+  height: 700px;
+  flex: 0 0 auto;
+  transform-origin: center center;
+  transform: scale(var(--fit, 1));
+  filter: drop-shadow(0 26px 40px rgba(0, 0, 0, .62));
+}
+
+.shell {
+  position: absolute;
+  inset: 0;
+  border-radius: 30px 30px 46px 46px;
+  background:
+    /* 塑料颗粒 */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='90' height='90' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E"),
+    linear-gradient(168deg, var(--shell-hi) 0%, var(--shell) 26%, var(--shell) 62%, var(--shell-lo) 100%);
+  background-blend-mode: soft-light, normal;
+  box-shadow:
+    inset 0 2px 1px rgba(255, 255, 255, .85),
+    inset 0 -3px 6px rgba(88, 78, 60, .45),
+    inset 3px 0 5px rgba(255, 255, 255, .35),
+    inset -3px 0 5px rgba(120, 110, 92, .3);
+  overflow: hidden;
+}
+
+/* 上壳中缝：老机器都有一条注塑分模线 */
+.shell::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 392px; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(120, 110, 92, .42) 12%,
+              rgba(120, 110, 92, .42) 88%, transparent);
+}
+
+/* ══ 上壳：铭牌 + 电源拨杆 ═══════════════════════════════ */
+
+.top {
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%; height: 58px;
+  padding: 0 26px 0 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand { display: flex; flex-direction: column; gap: 2px; }
+
+.brand-main {
+  font: 800 21px/1 'Arial Black', Impact, system-ui, sans-serif;
+  letter-spacing: 3.5px;
+  color: #b8342a;
+  transform: skewX(-9deg);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .7), 0 -1px 1px rgba(90, 20, 14, .35);
+}
+
+.brand-sub {
+  font: 700 8px/1 system-ui, sans-serif;
+  letter-spacing: 1.6px;
+  color: var(--ink-print);
+  opacity: .85;
+}
+.brand-sub b { color: #b8342a; }
+
+.power {
+  appearance: none;
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.power-track {
+  position: relative;
+  width: 34px; height: 17px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #8f887a, #cdc6b7);
+  box-shadow: inset 0 2px 3px rgba(60, 54, 42, .6), 0 1px 0 rgba(255, 255, 255, .6);
+}
+
+.power-knob {
+  position: absolute;
+  top: 1.5px; right: 1.5px;
+  width: 15px; height: 14px;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #f2eee5, #b4ac9c);
+  box-shadow: 0 1px 2px rgba(40, 34, 24, .55), inset 0 1px 0 #fff;
+  transition: right .16s ease;
+}
+.power:active .power-knob { right: 17.5px; }
+
+.power-text {
+  font: 700 7px/1.35 system-ui, sans-serif;
+  letter-spacing: .8px;
+  color: var(--ink-print);
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+.power-text b { font-weight: 700; opacity: .55; }
+
+/* ══ 屏幕总成 ════════════════════════════════════════════ */
+
+.screen {
+  position: absolute;
+  left: 30px; top: 58px;
+  width: 300px; height: 330px;
+  padding: 16px;
+  border-radius: 12px;
+  background: linear-gradient(165deg, var(--bezel-hi), var(--bezel) 40%, var(--bezel-lo));
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, .16),
+    inset 0 -1px 3px rgba(0, 0, 0, .8),
+    0 2px 3px rgba(255, 255, 255, .5),
+    0 -1px 2px rgba(90, 80, 62, .5);
+}
+
+/* 边框上的丝印小字 */
+.screen::after {
+  content: 'S U P E R · L C D';
+  position: absolute;
+  left: 0; right: 0; bottom: 3px;
+  text-align: center;
+  font: 700 6px/1 system-ui, sans-serif;
+  letter-spacing: 2px;
+  color: rgba(226, 220, 205, .3);
+}
+
+.glass {
+  position: relative;
+  width: 268px; height: 298px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--lcd-bg);
+  box-shadow:
+    inset 0 0 0 1px var(--lcd-edge),
+    inset 0 3px 8px rgba(40, 52, 28, .45),
+    0 0 0 1px rgba(0, 0, 0, .55),
+    0 0 22px 2px var(--lcd-glow);
+  transition: background .35s ease, box-shadow .35s ease;
+}
+
+.glass canvas {
+  display: block;
+  width: 268px; height: 298px;
+}
+
+/* 玻璃反光：一道斜向高光 + 左上角柔和亮斑 */
+.glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, .16) 0%, rgba(255, 255, 255, .05) 18%,
+      transparent 34%, transparent 66%, rgba(255, 255, 255, .045) 78%, rgba(255, 255, 255, .1) 100%),
+    radial-gradient(75% 55% at 18% 8%, rgba(255, 255, 255, .17), transparent 70%),
+    radial-gradient(120% 100% at 50% 120%, rgba(20, 30, 12, .3), transparent 60%);
+}
+
+/* 背光打开：LCD 变亮黄绿并向外溢出光 */
+body.lit {
+  --lcd-bg: #c2e155;
+  --lcd-edge: #a8c93c;
+  --lcd-glow: rgba(178, 226, 74, .5);
+}
+
+/* ══ 电源灯与丝印铭牌 ════════════════════════════════════ */
+
+.plate {
+  position: absolute;
+  left: 30px; top: 392px;
+  width: 300px; height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.led {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #6d3a34;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, .5);
+  transition: background .2s ease, box-shadow .2s ease;
+}
+body.on .led {
+  background: #ff4436;
+  box-shadow: 0 0 7px 2px rgba(255, 68, 54, .75), inset 0 0 2px #ffd6d2;
+}
+
+.plate-text {
+  font: 700 7px/1 system-ui, sans-serif;
+  letter-spacing: 1.2px;
+  color: var(--ink-print);
+}
+
+.plate-mark {
+  margin-left: auto;
+  font: 600 7px/1 system-ui, sans-serif;
+  letter-spacing: .9px;
+  color: var(--ink-print);
+  opacity: .62;
+}
+.plate-mark b { color: #b8342a; opacity: .8; }
+
+/* ══ 十字键 ══════════════════════════════════════════════ */
+
+.controls {
+  position: absolute;
+  left: 0; top: 414px;
+  width: 100%; height: 168px;
+  padding: 0 26px 0 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dpad { position: relative; width: 132px; height: 132px; flex: 0 0 auto; }
+
+/* 十字底座＝横竖两根圆角条 */
+.dpad-base::before, .dpad-base::after {
+  content: '';
+  position: absolute;
+  border-radius: 9px;
+  background: linear-gradient(158deg, var(--key-hi), var(--key) 45%, var(--key-lo));
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, .3),
+    inset 0 -2px 3px rgba(0, 0, 0, .45),
+    0 3px 5px rgba(45, 40, 32, .5),
+    0 0 0 2px rgba(120, 110, 92, .28);
+}
+.dpad-base::before { left: 0; top: 44px; width: 132px; height: 44px; }
+.dpad-base::after  { left: 44px; top: 0; width: 44px; height: 132px; }
+
+/* 中心凹点：遮住两根条的交叉缝 */
+.dpad-dot {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 26px; height: 26px;
+  margin: -13px 0 0 -13px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, #5d5952, #403d38);
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, .6), inset 0 -1px 0 rgba(255, 255, 255, .12);
+  pointer-events: none;
+}
+
+.dp {
+  position: absolute;
+  width: 44px; height: 44px;
+  appearance: none;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  touch-action: none;
+}
+.dp.up    { left: 44px; top: 0; }
+.dp.down  { left: 44px; top: 88px; }
+.dp.left  { left: 0; top: 44px; }
+.dp.right { left: 88px; top: 44px; }
+
+/* 箭头 */
+.dp::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 0; height: 0;
+  border: 7px solid transparent;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, .35));
+}
+.dp.up::after    { margin: -11px 0 0 -7px; border-bottom-color: #ded8cc; }
+.dp.down::after  { margin: -3px 0 0 -7px;  border-top-color: #ded8cc; }
+.dp.left::after  { margin: -7px 0 0 -11px; border-right-color: #ded8cc; }
+.dp.right::after { margin: -7px 0 0 -3px;  border-left-color: #ded8cc; }
+
+/* 按下：该臂压进去 */
+.dp::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 7px;
+  opacity: 0;
+  background: rgba(0, 0, 0, .3);
+  box-shadow: inset 0 3px 6px rgba(0, 0, 0, .55);
+}
+.dp.pressed::before { opacity: 1; }
+.dp.pressed::after { transform: scale(.9); }
+
+/* ══ 动作键 ══════════════════════════════════════════════ */
+
+.action { position: relative; width: 132px; height: 132px; flex: 0 0 auto; }
+
+.round {
+  position: absolute;
+  appearance: none;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform .06s ease, box-shadow .06s ease;
+}
+.round i {
+  font: 700 11px/1 system-ui, sans-serif;
+  font-style: normal;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, .92);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .45);
+}
+
+.round.a {
+  right: 0; top: 16px;
+  width: 68px; height: 68px;
+  background: radial-gradient(circle at 38% 26%, var(--red-hi), var(--red) 52%, var(--red-lo));
+  box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, .38),
+    inset 0 -4px 6px rgba(0, 0, 0, .38),
+    0 5px 8px rgba(45, 20, 16, .5),
+    0 0 0 3px rgba(120, 110, 92, .3);
+}
+.round.b {
+  left: 2px; top: 62px;
+  width: 56px; height: 56px;
+  background: radial-gradient(circle at 38% 26%, var(--blue-hi), var(--blue) 52%, var(--blue-lo));
+  box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, .34),
+    inset 0 -4px 6px rgba(0, 0, 0, .38),
+    0 5px 8px rgba(20, 28, 45, .5),
+    0 0 0 3px rgba(120, 110, 92, .3);
+}
+.round.b i { font-size: 10px; }
+
+.round.pressed { transform: translateY(3px) scale(.97); }
+.round.a.pressed { box-shadow: inset 0 3px 6px rgba(0, 0, 0, .5), 0 1px 2px rgba(45, 20, 16, .5), 0 0 0 3px rgba(120, 110, 92, .3); }
+.round.b.pressed { box-shadow: inset 0 3px 6px rgba(0, 0, 0, .5), 0 1px 2px rgba(20, 28, 45, .5), 0 0 0 3px rgba(120, 110, 92, .3); }
+
+/* ══ 功能键 ══════════════════════════════════════════════ */
+
+.fn {
+  position: absolute;
+  left: 30px; top: 582px;
+  width: 300px; height: 50px;
+  display: flex;
+  gap: 12px;
+}
+
+.key {
+  flex: 1;
+  appearance: none;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  touch-action: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding-top: 2px;
+  font: 700 12px/1 system-ui, sans-serif;
+  color: #f0ece2;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .5);
+  background: linear-gradient(170deg, var(--key-hi), var(--key) 42%, var(--key-lo));
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, .3),
+    inset 0 -2px 3px rgba(0, 0, 0, .4),
+    0 3px 5px rgba(45, 40, 32, .45),
+    0 0 0 2px rgba(120, 110, 92, .25);
+  transition: transform .06s ease, box-shadow .06s ease;
+}
+.key small {
+  font: 700 6px/1 system-ui, sans-serif;
+  letter-spacing: 1px;
+  opacity: .6;
+}
+.key.pressed {
+  transform: translateY(2px);
+  box-shadow: inset 0 3px 6px rgba(0, 0, 0, .5), 0 0 0 2px rgba(120, 110, 92, .25);
+}
+/* 音效关闭 / 背光打开时给对应键一点状态色 */
+.key.off { color: #b8b2a6; }
+.key.active { background: linear-gradient(170deg, #d8c24a, #b99f28 45%, #8a731a); color: #2a2408; text-shadow: none; }
+
+/* ══ 底部：喇叭孔 + 操作提示 ═════════════════════════════ */
+
+.bottom {
+  position: absolute;
+  left: 0; top: 638px;
+  width: 100%; height: 62px;
+}
+
+.speaker {
+  position: absolute;
+  right: 30px; top: 6px;
+  width: 92px; height: 30px;
+  border-radius: 4px;
+  background-image: radial-gradient(circle, rgba(70, 62, 48, .78) 1.7px, transparent 2px);
+  background-size: 11px 10px;
+  background-position: 2px 2px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35);
+}
+
+.hint {
+  position: absolute;
+  left: 30px; top: 11px;
+  width: 198px;
+  font: 600 8.5px/1.55 system-ui, sans-serif;
+  letter-spacing: .2px;
+  color: var(--ink-print);
+  opacity: .78;
+}
+
+/* ══ 四角螺丝 ════════════════════════════════════════════ */
+
+.screw {
+  position: absolute;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #cfc8b8, #8e8677 62%, #6f6759);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, .5), 0 1px 1px rgba(255, 255, 255, .45);
+}
+.screw::after {
+  content: '';
+  position: absolute;
+  left: 2px; top: 5px;
+  width: 8px; height: 2px;
+  border-radius: 1px;
+  background: rgba(54, 48, 38, .68);
+  box-shadow: 0 0 0 .5px rgba(255, 255, 255, .3);
+  transform: rotate(38deg);
+}
+.screw.tl { left: 11px; top: 11px; }
+.screw.tr { right: 11px; top: 11px; }
+.screw.bl { left: 13px; bottom: 13px; }
+.screw.br { right: 13px; bottom: 13px; }
+/* ══ 焦点（TV 遥控必需） ═════════════════════════════════ */
+
+.dp:focus-visible, .round:focus-visible, .key:focus-visible, .power:focus-visible {
+  outline: 3px solid #ffb020;
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+.round:focus-visible { border-radius: 50%; }
+
+/* TV 上焦点要更醒目：加一层光晕 */
+body.tv .dp:focus-visible, body.tv .round:focus-visible,
+body.tv .key:focus-visible, body.tv .power:focus-visible {
+  outline-width: 4px;
+  box-shadow: 0 0 0 8px rgba(255, 176, 32, .25);
+}
+body.tv .hint { font-size: 9.5px; }
+
+/* 遥控焦点：容器转发的按键不会让浏览器进入 :focus-visible，只能自己标 */
+.tv-focus {
+  outline: 4px solid #ffb020;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 8px rgba(255, 176, 32, .25);
+}
+.key.tv-focus { border-radius: 8px; }
+.power.tv-focus { border-radius: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .power-knob, .round, .key { transition: none; }
+}
+

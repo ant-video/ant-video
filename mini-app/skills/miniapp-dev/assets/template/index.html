@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>__NAME__</title>
+  <link rel="stylesheet" href="style.css" />
+  <!--
+    以下两段只在浏览器里生效：宿主会在 document-start 注入真 SDK，
+    ant-mock.js 检测到就自动退让，所以留在包里无害。
+  -->
+  <script>
+    window.__antMockPermissions = __PERMISSIONS_JS__;  // 必须与 manifest.permissions 一致
+    window.__antMockAppId = '__APP_ID__';
+    window.__antMockTV = false;                        // 想验证 TV 焦点逻辑时改 true
+    window.__antMockFixtures = {};                     // ant.source.* 的假数据
+  </script>
+  <script src="ant-mock.js"></script>
+</head>
+<body>
+  <header class="bar">
+    <h1>__NAME__</h1>
+    <p id="env" class="muted">正在读取环境信息…</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <div class="row">
+        <button data-action="hello">打个招呼</button>
+        <button data-action="keys">看看存了什么</button>
+      </div>
+      <pre id="output">点上面的按钮试试。</pre>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

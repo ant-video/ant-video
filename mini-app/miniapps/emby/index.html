@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>影视库</title>
+  <link rel="stylesheet" href="theme.css" />
+</head>
+<body>
+  <header id="app-header"></header>
+  <main id="app-main">
+    <section id="hero"></section>
+    <div id="rails"></div>
+  </main>
+
+  <script src="lib.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var U = window.EmbyUI;
+      var MAX_RAILS = 6;
+
+      var hero = document.getElementById('hero');
+      var rails = document.getElementById('rails');
+
+      function railSection(id, title, more) {
+        return '<section class="section"><div class="section-head">' +
+          '<h2>' + U.esc(title) + '</h2>' +
+          (more ? '<button data-focus class="more" data-more="' + id + '">查看全部 ›</button>' : '') +
+          '</div><div class="rail" id="rail-' + id + '"></div></section>';
+      }
+
+      function paintHero(vod) {
+        if (!vod) { hero.innerHTML = ''; return; }
+        var bg = vod.vod_pic
+          ? '<div class="hero-bg" style="background-image:url(' + U.esc(vod.vod_pic) + ')"></div>'
+          : '<div class="hero-bg" style="background:linear-gradient(135deg,#2a2a30,#141417)"></div>';
+        var pills = [vod.vod_year, vod.vod_area, vod.vod_type]
+          .filter(Boolean)
+          .map(function (t) { return '<span class="pill">' + U.esc(t) + '</span>'; })
+          .join('');
+        if (vod.vod_remarks) {
+          pills += '<span class="pill accent">' + U.esc(vod.vod_remarks) + '</span>';
+        }
+        var overview = (vod.vod_content || '').replace(/<[^>]+>/g, '').trim();
+
+        hero.className = 'hero';
+        hero.innerHTML = bg + '<div class="hero-scrim"></div>' +
+          '<div class="hero-body">' +
+          '<h1 class="hero-title">' + U.esc(vod.vod_name || '') + '</h1>' +
+          (pills ? '<div class="meta">' + pills + '</div>' : '') +
+          (overview ? '<p class="hero-overview">' + U.esc(overview) + '</p>' : '') +
+          '<div class="btn-row">' +
+          '<button data-focus class="btn primary" id="hero-play">▶ 播放</button>' +
+          '<button data-focus class="btn" id="hero-detail">详情</button>' +
+          '</div></div>';
+
+        document.getElementById('hero-detail').addEventListener('click', function () {
+          U.openDetail(vod);
+        });
+        document.getElementById('hero-play').addEventListener('click', function () {
+          playFirst(vod);
+        });
+      }
+
+      /** hero 的播放：拉详情 → 取第一条线路第一集 → 交给宿主播放器 */
+      function playFirst(vod) {
+        var siteKey = window.App.site.key;
+        ant.ui.loading('正在准备…');
+        ant.source.detail({ siteKey: siteKey, id: vod.vod_id })
+          .then(function (full) {
+            var lines = U.parseLines(full);
+            if (!lines.length) {
+              var e = new Error('这个条目没有可播放的线路');
+              e.code = 'NO_LINE';
+              throw e;
+            }
+            return ant.ui.hideLoading().then(function () {
+              U.pushHistory(siteKey, full.vod_name ? full : vod);
+              return U.playEpisode(siteKey, full, lines[0], lines[0].episodes[0]);
+            });
+          })
+          .catch(function (e) {
+            ant.ui.hideLoading().then(function () {
+              if (e && (e.code === 'NEED_SNIFF' || e.code === 'NO_URL')) return;
+              U.toast('播放失败：' + U.errText(e));
+            });
+          });
+      }
+
+      function renderRail(id, list, empty) {
+        U.renderCards(document.getElementById('rail-' + id), list, { empty: empty });
+      }
+
+      function loadHistoryRail() {
+        return U.getHistory().then(function (list) {
+          var siteKey = window.App.site.key;
+          var mine = list.filter(function (item) { return item.siteKey === siteKey; });
+          if (!mine.length) return;
+          rails.insertAdjacentHTML('afterbegin', railSection('history', '继续观看', false));
+          renderRail('history', mine);
+        });
+      }
+
+      function start() {
+        rails.innerHTML = U.skeleton(6) + U.skeleton(6);
+
+        var siteKey = window.App.site.key;
+        return ant.source.home(siteKey).then(function (home) {
+          var classes = (home && home.classes) || [];
+          var recommend = (home && home.list) || [];
+
+          paintHero(recommend.find(function (v) { return !!v.vod_pic; }) || recommend[0]);
+
+          var picked = classes.filter(function (c) { return c.type_id; }).slice(0, MAX_RAILS);
+          rails.innerHTML =
+            (recommend.length ? railSection('recommend', '推荐', false) : '') +
+            picked.map(function (c, i) {
+              return railSection('c' + i, c.type_name || ('分类 ' + (i + 1)), true);
+            }).join('');
+
+          if (recommend.length) renderRail('recommend', recommend);
+
+          rails.querySelectorAll('[data-more]').forEach(function (node) {
+            var index = Number(node.dataset.more.slice(1));
+            node.addEventListener('click', function () {
+              U.openLibrary(picked[index].type_id, picked[index].type_name);
+            });
+          });
+
+          picked.forEach(function (c, i) {
+            document.getElementById('rail-c' + i).innerHTML = U.skeleton(5, null);
+          });
+
+          return loadHistoryRail().then(function () {
+            // 采集源在宿主侧并发上限是 3，这里用 2 稳一点
+            return U.pool(picked, 2, function (c, i) {
+              return ant.source
+                .category({ siteKey: siteKey, tid: c.type_id, page: 1 })
+                .then(function (res) {
+                  var list = (res && res.list) || [];
+                  renderRail('c' + i, list, '这个分类没有返回内容');
+                  if (!document.querySelector('#hero .hero-title')) {
+                    paintHero(list.find(function (v) { return !!v.vod_pic; }));
+                  }
+                })
+                .catch(function (e) {
+                  var box = document.getElementById('rail-c' + i);
+                  if (box) {
+                    box.innerHTML = '<div class="hint" style="padding:18px 0">加载失败：' +
+                      U.esc(U.errText(e)) + '</div>';
+                  }
+                });
+            });
+          });
+        }).catch(function (e) {
+          rails.innerHTML = U.stateHtml('⚠️', '首页加载失败', U.esc(U.errText(e)));
+        });
+      }
+
+      U.boot({ active: 'home' }).then(function (ok) {
+        if (!ok) return;
+        start();
+
+        // 从播放页/详情页回来时刷新"继续观看"
+        ant.onShow(function () {
+          if (!document.getElementById('rail-history')) return;
+          U.getHistory().then(function (list) {
+            var siteKey = window.App.site && window.App.site.key;
+            renderRail('history', list.filter(function (i) {
+              return i.siteKey === siteKey;
+            }));
+          });
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+# macOS / Windows 资源垃圾（进包会占文件数配额，且 .DS_Store 无意义）
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 依赖与构建产物（打包时用 pack_miniapp.py 从 dist/ 打，不需要入库）
+node_modules/
+dist/
+build/
+
+# 编辑器
+.idea/
+.vscode/
+*.swp
+
+# 注意：market/zip/*.zip 必须入库 —— market.json 的 url 直链指向它们

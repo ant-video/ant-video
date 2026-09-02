@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>搜索</title>
+  <link rel="stylesheet" href="theme.css" />
+</head>
+<body>
+  <header id="app-header"></header>
+  <main id="app-main">
+    <div class="search-bar">
+      <input id="kw" type="search" enterkeyhint="search" placeholder="搜片名、演员…" />
+      <button data-focus class="btn primary" id="go">搜索</button>
+    </div>
+    <div id="recent" class="chips" style="padding-top:10px"></div>
+    <div id="grid" class="grid"></div>
+    <div id="more" class="loading-more"></div>
+  </main>
+
+  <script src="lib.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var U = window.EmbyUI;
+
+      var input = document.getElementById('kw');
+      var recentBox = document.getElementById('recent');
+      var grid = document.getElementById('grid');
+      var moreBox = document.getElementById('more');
+
+      var state = {
+        siteKey: '',
+        keyword: '',
+        page: 1,
+        list: [],
+        loading: false,
+        done: false
+      };
+
+      function paintRecent() {
+        return ant.storage.getJSON('searchHistory', []).then(function (list) {
+          var words = Array.isArray(list) ? list : [];
+          if (!words.length) { recentBox.innerHTML = ''; return; }
+          recentBox.innerHTML =
+            words.map(function (w) {
+              return '<button data-focus class="chip" data-kw="' + U.esc(w) + '">' +
+                U.esc(w) + '</button>';
+            }).join('') +
+            '<button data-focus class="chip" id="clear-recent">清空</button>';
+
+          recentBox.querySelectorAll('[data-kw]').forEach(function (node) {
+            node.addEventListener('click', function () {
+              input.value = node.dataset.kw;
+              search(node.dataset.kw);
+            });
+          });
+          document.getElementById('clear-recent').addEventListener('click', function () {
+            ant.storage.setJSON('searchHistory', []).then(paintRecent);
+          });
+        });
+      }
+
+      function rememberKeyword(word) {
+        return ant.storage.getJSON('searchHistory', []).then(function (list) {
+          var words = (Array.isArray(list) ? list : []).filter(function (w) {
+            return w !== word;
+          });
+          words.unshift(word);
+          return ant.storage.setJSON('searchHistory', words.slice(0, 10));
+        }).then(paintRecent);
+      }
+
+      function search(word) {
+        var keyword = String(word || '').trim();
+        if (!keyword) { U.toast('输入点什么再搜'); return; }
+        if (!window.App.site.searchable) {
+          U.toast('当前采集源不支持搜索，先换个源');
+        }
+        state.keyword = keyword;
+        state.page = 1;
+        state.list = [];
+        state.done = false;
+        grid.innerHTML = U.skeleton(9, null);
+        moreBox.textContent = '';
+        rememberKeyword(keyword);
+        fetchPage();
+      }
+
+      function fetchPage() {
+        if (state.loading || state.done) return;
+        state.loading = true;
+
+        ant.source
+          .search({ siteKey: state.siteKey, wd: state.keyword, page: state.page })
+          .then(function (res) {
+            var list = (res && res.list) || [];
+            if (state.page === 1) state.list = [];
+            state.list = state.list.concat(list);
+
+            if (!state.list.length) {
+              grid.innerHTML = '';
+              moreBox.innerHTML = U.stateHtml('🔍', '没有找到「' + U.esc(state.keyword) + '」',
+                '换个关键词，或者切到别的采集源再搜一次。');
+              state.done = true;
+              return;
+            }
+
+            U.renderCards(grid, state.list);
+            if (!list.length) {
+              state.done = true;
+              moreBox.textContent = '没有更多了';
+            } else {
+              state.page += 1;
+              moreBox.innerHTML =
+                '<button data-focus class="chip" id="load-more">加载更多</button>';
+              document.getElementById('load-more')
+                .addEventListener('click', function () {
+                  moreBox.textContent = '加载中…';
+                  fetchPage();
+                });
+            }
+          })
+          .catch(function (e) {
+            if (state.page === 1) {
+              grid.innerHTML = '';
+              moreBox.innerHTML = U.stateHtml('⚠️', '搜索失败', U.esc(U.errText(e)));
+            } else {
+              moreBox.textContent = '加载失败：' + U.errText(e);
+            }
+            state.done = true;
+          })
+          .then(function () { state.loading = false; });
+      }
+
+      document.getElementById('go').addEventListener('click', function () {
+        search(input.value);
+      });
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') search(input.value);
+      });
+
+      U.boot({ active: 'search' }).then(function (ok) {
+        if (!ok) return;
+        state.siteKey = window.App.site.key;
+        paintRecent();
+
+        var initial = U.qs('wd');
+        if (initial) { input.value = initial; search(initial); }
+        else {
+          moreBox.innerHTML = U.stateHtml('🔍', '搜索 ' + U.esc(window.App.site.name),
+            '搜索走的是宿主当前采集源；<br/>右上角可以换源。');
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

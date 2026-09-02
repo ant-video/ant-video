@@ -1,0 +1,10 @@
+{
+  "appId": "__APP_ID__",
+  "name": "__NAME__",
+  "version": "1.0.0",
+  "versionCode": 1,
+  "renderer": "webview",
+  "entry": "index.html",
+  "description": "__DESCRIPTION__",
+  "permissions": __PERMISSIONS__
+}

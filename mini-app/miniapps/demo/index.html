@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>示例小程序</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>示例小程序</h1>
+    <p id="env">正在读取环境信息…</p>
+  </header>
+
+  <section>
+    <h2>基础能力</h2>
+    <div class="grid">
+      <button data-action="toast">Toast</button>
+      <button data-action="confirm">确认框</button>
+      <button data-action="sheet">操作表</button>
+      <button data-action="loading">Loading 1.5s</button>
+      <button data-action="clipboard">写剪贴板</button>
+      <button data-action="request">发起请求</button>
+      <button data-action="storage-set">存一条数据</button>
+      <button data-action="storage-get">读回数据</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>播放器</h2>
+    <div class="grid">
+      <button data-action="play">播放测试视频</button>
+      <button data-action="player-state">查询播放状态</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>采集源</h2>
+    <div class="grid">
+      <button data-action="source-list">站点列表</button>
+      <button data-action="source-search">在首个站点搜索「斗罗」</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>导航</h2>
+    <div class="grid">
+      <button data-action="navigate">打开第二页</button>
+      <button data-action="exit">退出小程序</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>输出</h2>
+    <pre id="output">点上面的按钮试试。</pre>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>

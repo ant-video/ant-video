@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#12100e" />
+  <title>俄罗斯方块</title>
+  <link rel="stylesheet" href="style.css" />
+  <!--
+    以下两段只在浏览器里生效：宿主会在 document-start 注入真 SDK，
+    ant-mock.js 检测到就自动退让，所以留在包里无害。
+  -->
+  <script>
+    window.__antMockPermissions = ["ui", "storage", "navigate"];  // 必须与 manifest.permissions 一致
+    window.__antMockAppId = 'com.leospring.tetris';
+    window.__antMockTV = false;                        // 想验证 TV 焦点逻辑时改 true
+    window.__antMockFixtures = {};                     // 本游戏不用采集源
+  </script>
+  <script src="ant-mock.js"></script>
+</head>
+<body>
+  <!-- 整机按固定设计尺寸 360x700 绘制，由 JS 用 transform: scale 适配任意屏幕 -->
+  <div class="stage">
+    <div class="machine" id="machine">
+      <div class="shell">
+
+        <!-- ── 上壳：铭牌 + 电源拨杆 ── -->
+        <div class="top">
+          <div class="brand">
+            <span class="brand-main">TETRIS</span>
+            <span class="brand-sub">BRICK GAME <b>·</b> 9999 IN 1</span>
+          </div>
+          <button class="power" id="btn-exit" type="button" aria-label="关机退出">
+            <span class="power-track"><span class="power-knob"></span></span>
+            <span class="power-text">ON<b>OFF</b></span>
+          </button>
+        </div>
+
+        <!-- ── 屏幕总成 ── -->
+        <div class="screen">
+          <div class="glass">
+            <canvas id="lcd" width="268" height="298" aria-label="游戏画面"></canvas>
+            <span class="glare" aria-hidden="true"></span>
+          </div>
+        </div>
+
+        <div class="plate">
+          <span class="led" id="led" aria-hidden="true"></span>
+          <span class="plate-text">POWER</span>
+          <span class="plate-mark">DOT MATRIX GAME <b>·</b> MODEL AT-9999</span>
+        </div>
+
+        <!-- ── 十字键 + 动作键 ── -->
+        <div class="controls">
+          <div class="dpad">
+            <span class="dpad-base" aria-hidden="true"></span>
+            <button class="dp up"    type="button" data-hold="rotate" aria-label="旋转"></button>
+            <button class="dp left"  type="button" data-hold="left"   aria-label="左移"></button>
+            <button class="dp right" type="button" data-hold="right"  aria-label="右移"></button>
+            <button class="dp down"  type="button" data-hold="down"   aria-label="加速下落"></button>
+            <span class="dpad-dot" aria-hidden="true"></span>
+          </div>
+          <div class="action">
+            <button class="round b" type="button" data-hold="drop"   aria-label="速降到底"><i>速降</i></button>
+            <button class="round a" type="button" data-hold="rotate" aria-label="旋转"><i>旋转</i></button>
+          </div>
+        </div>
+
+        <!-- ── 功能键 ── -->
+        <div class="fn">
+          <button class="key" id="btn-start" type="button">开始<small>START</small></button>
+          <button class="key" id="btn-sound" type="button">音效<small>SOUND</small></button>
+          <button class="key" id="btn-light" type="button">背光<small>LIGHT</small></button>
+          <button class="key" id="btn-reset" type="button">重玩<small>RESET</small></button>
+        </div>
+
+        <div class="bottom">
+          <span class="speaker" aria-hidden="true"></span>
+          <p class="hint" id="hint">←→ 移动 · ↑ 旋转 · ↓ 加速 · 空格速降</p>
+        </div>
+
+        <i class="screw tl" aria-hidden="true"></i>
+        <i class="screw tr" aria-hidden="true"></i>
+        <i class="screw bl" aria-hidden="true"></i>
+        <i class="screw br" aria-hidden="true"></i>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/audio.js"></script>
+  <script src="js/tetris.js"></script>
+  <script src="js/lcd.js"></script>
+  <script src="js/input.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
