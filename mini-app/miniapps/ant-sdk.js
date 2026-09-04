@@ -92,12 +92,88 @@
     }
   };
 
+  /* ---------------- 反向服务 ---------------- */
+
+  var serveHandler = null;
+
+  /**
+   * 注册一个「宿主可以调用的 HTTP 处理器」，需要 service 权限。
+   *
+   * 宿主的 loopback 服务会把 `/<token>/__service/*` 上收到的请求转成对象交给
+   * handler，再把返回值变回 HTTP 响应，于是宿主自己的 Dart 代码（例如播放器
+   * 取弹幕）能把这段 JS 当本地服务用。声明了 service 权限的小程序会在宿主
+   * 需要时被后台拉起，所以 handler 必须能在页面不可见的情况下工作。
+   *
+   * handler 收到 `{method, path, query, headers, body}`，可以返回：
+   *   - 标准 `Response` 对象（Web 风格的 handler 直接透传即可）
+   *   - `{status, headers, body}`，二进制用 `bodyBase64`
+   *   - 一个字符串（当作 200 text）
+   *
+   * @returns {function} 取消注册
+   */
+  function serve(handler) {
+    serveHandler = typeof handler === 'function' ? handler : null;
+    return function () {
+      if (serveHandler === handler) serveHandler = null;
+    };
+  }
+
+  /** 把 handler 的返回值归一化成宿主认识的响应结构。 */
+  function normalizeServeResponse(res) {
+    if (res === null || res === undefined) return null;
+    if (typeof res === 'string') return { status: 200, headers: {}, body: res };
+
+    // 标准 Response：Cloudflare Worker 风格的 handler 直接产出这个，
+    // 支持它意味着这类服务几乎不用写适配层。
+    if (typeof Response !== 'undefined' && res instanceof Response) {
+      var headers = {};
+      if (res.headers && typeof res.headers.forEach === 'function') {
+        res.headers.forEach(function (value, key) {
+          headers[key] = value;
+        });
+      }
+      var status = res.status;
+      return res.text().then(function (body) {
+        return { status: status, headers: headers, body: body };
+      });
+    }
+
+    return {
+      status: res.status || res.statusCode || 200,
+      headers: res.headers || {},
+      body: res.body,
+      bodyBase64: res.bodyBase64
+    };
+  }
+
+  /** 宿主 → 小程序的请求入口，由 Dart 侧 callAsyncJavaScript 调用。 */
+  window.__antServe = function (payload) {
+    if (!serveHandler) return Promise.resolve(null);
+    return Promise.resolve()
+      .then(function () {
+        return serveHandler(payload || {});
+      })
+      .then(normalizeServeResponse)
+      .catch(function (e) {
+        console.error('[ant] 服务处理异常', e);
+        return {
+          status: 500,
+          headers: {},
+          body: String((e && e.message) || e)
+        };
+      });
+  };
+
   /* ---------------- 网络 ---------------- */
 
   /**
    * 发起请求。走宿主的 Dio，因此不受浏览器 CORS 限制，
    * 但域名要落在 manifest 的 network.allowlist 内。
-   * @returns {Promise<{statusCode:number, headers:object, data:string}>}
+   *
+   * `responseType: 'base64'` 时 data 是 base64 串而不是文本——响应是
+   * protobuf / gzip / brotli 这类二进制时必须这样取，按文本解码会毁掉字节。
+   * @returns {Promise<{statusCode:number, headers:object, data:string,
+   *   responseType:string, byteLength?:number}>}
    */
   function request(options) {
     var opts = typeof options === 'string' ? { url: options } : options || {};
@@ -106,7 +182,28 @@
       method: opts.method || 'GET',
       headers: opts.headers || null,
       data: opts.data,
-      timeout: opts.timeout
+      timeout: opts.timeout,
+      responseType: opts.responseType || 'text',
+      followRedirects: opts.followRedirects !== false
+    });
+  }
+
+  /** base64 串 → Uint8Array。 */
+  function base64ToBytes(base64) {
+    var binary = atob(base64 || '');
+    var bytes = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+
+  /** request 的二进制便捷版，直接给 Uint8Array。 */
+  function requestBytes(options) {
+    var opts = typeof options === 'string' ? { url: options } : options || {};
+    opts.responseType = 'base64';
+    return request(opts).then(function (res) {
+      return base64ToBytes(res.data);
     });
   }
 
@@ -193,10 +290,19 @@
   /* ---------------- 播放器 ---------------- */
 
   var player = {
-    /** 推到宿主全屏播放页；退出播放页会收到 player.close 事件。 */
+    /**
+     * 推到宿主全屏播放页；退出播放页会收到 player.close 事件。
+     *
+     * options.headers 是取流请求头（Referer / User-Agent / Cookie / 鉴权头），
+     * ant.source.play 返回的 header 可以直接原样传进来。
+     */
     open: function (options) {
       var opts = typeof options === 'string' ? { url: options } : options || {};
-      return invoke('player.open', { url: opts.url, title: opts.title });
+      return invoke('player.open', {
+        url: opts.url,
+        title: opts.title,
+        headers: opts.headers || opts.header
+      });
     },
     getState: function () {
       return invoke('player.getState', {});
@@ -280,7 +386,7 @@
 
   window.ant = {
     /** SDK 协议版本，与宿主 env.getSystemInfo().sdkVersion 对应。 */
-    version: 1,
+    version: 2,
     invoke: invoke,
     on: on,
     off: off,
@@ -291,6 +397,9 @@
     },
     request: request,
     requestJson: requestJson,
+    requestBytes: requestBytes,
+    base64ToBytes: base64ToBytes,
+    serve: serve,
     storage: storage,
     ui: ui,
     clipboard: clipboard,

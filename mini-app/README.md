@@ -13,13 +13,13 @@ mini-app/
 │  ├─ miniapp-developer-guide.md   开发引导：manifest、权限、JSAPI、打包发版
 │  └─ miniapp-standalone-dev.md    脱离宿主开发调试：三阶段流程 + mock SDK 全文
 ├─ miniapps/
-│  ├─ ant-sdk.js                   宿主注入的真 SDK（协议 v1，行为有疑问时以它为准）
+│  ├─ ant-sdk.js                   宿主注入的真 SDK（协议 v2，行为有疑问时以它为准）
 │  ├─ demo/                        覆盖全部 JSAPI 的最小示例
 │  ├─ tetris/                      俄罗斯方块（纯前端游戏 + TV 遥控）
 │  └─ emby/                        影视库（多页面 + 采集源 + 播放 + 续播）
-├─ market/zip/
+├─ market/
 │  ├─ market.json                  市场清单，用户在宿主「市场」Tab 填它的地址
-│  └─ *.zip                        各小程序的安装包
+│  └─ zip/*.zip                    各小程序的安装包
 └─ skills/miniapp-dev/             Claude Code skill：脚手架 / mock SDK / 预检 / 打包
 ```
 
@@ -27,11 +27,19 @@ mini-app/
 
 | 小程序 | appId | 权限 | 看点 |
 |---|---|---|---|
-| **示例小程序** `miniapps/demo/` | `com.leospring.demo` | 全部 6 项 | 一屏按钮逐个试 `ant.*`，动手前先跑它 |
+| **示例小程序** `miniapps/demo/` | `com.leospring.demo` | ui / storage / network / navigate / player / source | 一屏按钮逐个试 `ant.*`（含二进制响应），动手前先跑它 |
 | **俄罗斯方块** `miniapps/tetris/` | `com.leospring.tetris` | ui / storage / navigate | 掌机复刻，Web Audio 音效 + LCD 光影；自带 `ant-mock.js`，浏览器里直接能玩 |
 | **影视库** `miniapps/emby/` | `com.leospring.emby` | ui / storage / navigate / player / source | Emby 风格四页面（首页 / 媒体库 / 搜索 / 详情），复用宿主已配置的采集源，续播记录存 `ant.storage` |
 
 三个都以 `com.leospring.*` 命名，与宿主内置的 `com.ant.*` 分开 —— appId 是唯一键，撞了会被当成同一个小程序。
+
+市场清单里还有一个 **LogVar 弹幕服务**（`com.logvar.danmu`），它演示的是**服务型小程序**：
+整个弹幕聚合服务跑在小程序里，播放器直接从它取弹幕，不用再自己部署 vercel / docker。
+源码不在本仓库，在上游 [huangxd-/danmu_api](https://github.com/huangxd-/danmu_api) 的 `miniapp/`
+目录（AGPL-3.0，包内附 `LICENSE` 与 `SOURCE.md`）。做法见下面的「服务型小程序」一节。
+
+`demo` 里没有 `ant.serve` 的按钮 —— 声明 `service` 权限会让小程序被宿主后台拉起，
+对一个纯演示包不合适。要看活例子就装弹幕服务。
 
 ## 五分钟上手
 
@@ -106,23 +114,75 @@ python3 skills/miniapp-dev/scripts/pack_miniapp.py  miniapps/hello
 ```js
 ant.env.getSystemInfo()   // {platform,osVersion,isTV,appId,devMode,permissions,sdkVersion}  免权限
 ant.log(msg)              // 免权限；console.* 也会进日志面板
-ant.request({url,method,headers,data,timeout})  // → {statusCode,headers,data:string}   [network]
+ant.request({url,method,headers,data,timeout,responseType,followRedirects})
+                          // → {statusCode,headers,data,responseType,url}            [network]
 ant.requestJson({url})                          // 非 2xx / 非法 JSON 会 reject         [network]
+ant.requestBytes({url}) · base64ToBytes(s)      // 二进制，→ Uint8Array                [network]
 ant.storage.get/set/getJSON/setJSON/remove/clear/keys()                                 [storage]
 ant.ui.toast/loading/hideLoading/confirm({title,content})/actionSheet([...])             [ui]
 ant.clipboard.get/set(text)                                                             [ui]
 ant.navigateTo/redirectTo(url) · navigateBack() · exitMiniApp()                         [navigate]
-ant.player.open({url,title}) · getState() · onStateChange(fn) · onClose(fn)              [player]
+ant.player.open({url,title,headers}) · getState() · onStateChange(fn) · onClose(fn)      [player]
 ant.source.list() · home(siteKey) · category({siteKey,tid,page,ext})
          · detail({siteKey,id}) · play({siteKey,flag,id}) · search({siteKey,wd,page})    [source]
+ant.serve(async req => resp)                    // 宿主反过来调你，见下一节          [service]
 ant.on/off/once(event, fn) · onShow(fn) · onHide(fn) · tv.onKey(fn)
 ```
 
 事件：`app.show`、`app.hide`、`player.open`、`player.stateChange`、`player.close`、`keydown`。
 
 `ant.request` 走宿主的 HTTP 客户端，**不受浏览器 CORS 限制** —— 这是相对纯 H5 的最大优势。
+要拿原始字节就用 `responseType: 'base64'`（或 `ant.requestBytes`）：protobuf、gzip/brotli、
+GBK 网页必须走这条，缺省的 `'text'` 会让宿主按 charset 解码，二进制经此一遭就毁了。
+
 采集源返回宿主内部的 `vod_*` 蛇形字段；用户可能一个站点都没配，`list()` 要按空数组处理。
-拿到 `source.play` 的地址接 `ant.player.open()` 就是一条完整的看片链路（自动复用 M3U8 代理、去广告、内核切换）。
+拿到 `source.play` 的地址接 `ant.player.open()` 就是一条完整的看片链路（自动复用 M3U8 代理、
+去广告、内核切换），它返回的 `header` 可以原样传给 `player.open` 的 `headers`。
+
+## 服务型小程序（`ant.serve`）
+
+需要 `service` 权限。前面所有能力都是「小程序调宿主」，这个反过来：把一段逻辑跑成宿主眼里的
+**本地 HTTP 服务**。市场里的弹幕服务就是这么接进播放器的。
+
+```js
+ant.serve(async (req) => {
+  // req = { method, path, query, params, headers, body, url }
+  if (req.path === '/api/v2/search/episodes') {
+    return { status: 200, headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify(await search(req.params.anime)) };
+  }
+  return { status: 404, body: 'not found' };
+});
+```
+
+`req.path` 已剥掉宿主的令牌与前缀，是干净的业务路径；`req.url` 是拼好的完整地址，
+Cloudflare Worker 风格的代码可以直接 `new URL(req.url)`。返回标准 `Response`、
+`{status, headers, body|bodyBase64}` 或裸字符串都认；返回 `null` 宿主收到 503。
+
+宿主侧用 **`miniapp://<appId>[/path]`** 引用（真地址的端口和令牌每次启动都变，所以存的是
+逻辑地址）。要点：
+
+- 宿主**会在用户没打开小程序时把它后台拉起**，所以 handler 必须能在页面不可见时工作 ——
+  别依赖 `requestAnimationFrame` / DOM / 用户点击；
+- 单次调用 60s 超时，请求体 ≤1MB；
+- 服务型实例在保活上限里排最后被回收，不会被随手开的小程序挤掉；
+- 用户手动结束实例就断服，调用方按「服务不可用」处理；
+- **调试模式测不了这块** —— dev server 实例没有本地服务，宿主没有可回调的入口，
+  只能装成 zip 之后验。
+
+### 共享到局域网
+
+小程序详情页、或「小程序设置 → 局域网共享」里可以开（默认关，只对声明了 `service` 的小程序
+显示）。宿主会另起一个绑 `0.0.0.0:9321` 的服务，给出 `http://<本机IP>:9321/<lanToken>`，
+同一网络里的别的设备填这个地址就能共用你这份服务。
+
+- **多个服务能同时开**：共用这一个端口（防火墙只放行一个就够），靠各自的 token 区分；
+  token 互不相同，泄露一个不影响别的，单独重置某一个也不动其它；
+- `lanToken` **持久化**，重启后不变 —— 不然别的设备每次都要重配。「重置地址」换掉它，
+  已经发出去的旧地址立刻失效；
+- 只有服务路由被暴露，**包内文件一个都碰不到**；来源 IP 不是私有网段直接 403；
+- 那个 token 就是唯一凭证。公共 WiFi 下开等于把你这个服务的能力（包括它的 `ant.request`
+  出网能力）交给同网段所有人。
 
 ## 硬规则
 
@@ -137,18 +197,20 @@ ant.on/off/once(event, fn) · onShow(fn) · onHide(fn) · tv.onKey(fn)
 | 每次发版 `versionCode` +1 | 装了新版打开还是老的 |
 | 要支持 TV 就必须实现 `ant.tv.onKey` | 电视上遥控器完全没反应（WebView 不参与系统焦点） |
 | `network.allowlist` 写了就要覆盖全部域名 | `HOST_NOT_ALLOWED`；点站内链接弹「离开小程序」。不写＝`ant.request` 不限制但导航只剩同源；**导航不认 `*`** |
+| 用了 `ant.serve` 就别依赖 DOM / 动画 / 用户点击 | 宿主会在页面不可见时后台拉起你，那时 `requestAnimationFrame` 被节流、没人点按钮 |
 | 构建工具设 `base: './'` / `publicPath: './'`，路由用 hash 模式 | 白屏；刷新 404 |
 | `viewport-fit=cover` + `env(safe-area-inset-*)` | 刘海屏 / 手势条被裁 |
 
 改不了的限制：`ant.request` 只允许 http/https，回环与内网地址（`localhost`、`127.x`、`10.x`、
 `172.16-31.x`、`192.168.x`、`169.254.x`）一律 `FORBIDDEN_HOST`，响应体 ≤10MB，超时上限 30s；
 `ant.storage` 配额 5MB、key ≤256 字符；采集源单次超时 60s、并发上限 3；
+`ant.serve` 单次 60s 超时、请求体 ≤1MB；
 包内单文件 ≤20MB、解压后 ≤100MB、文件数 ≤2000，不能含符号链接。
 
 ## 分发
 
 zip 传到任何能直链下载的地方，再提供一个 JSON 清单地址，用户在宿主「市场」Tab 填它即可。
-本仓库的清单就是 `market/zip/market.json`：
+本仓库的清单就是 `market/market.json`：
 
 ```json
 {
@@ -202,8 +264,10 @@ skills/miniapp-dev/
    └─ pack_miniapp.py          打包（python zipfile，保证 manifest 落在包根）
 ```
 
-> 宿主的 `ant-sdk.js` 加了新 API 时，同步更新 skill 的 `assets/ant-mock.js`、`references/jsapi.md`
-> 和 `scripts/check_miniapp.py` 里的 `PERM_OF` 权限映射表。
+> 宿主的 `ant-sdk.js` 加了新 API 时，同步更新 skill 的 `assets/ant-mock.js`、`references/jsapi.md`，
+> 以及两个脚本里的权限表 —— `scripts/check_miniapp.py` 的 `KNOWN_PERMS` 与 `PERM_OF`、
+> `scripts/new_miniapp.py` 的 `KNOWN_PERMS`。加新权限时别漏 `new_miniapp.py`，
+> 不然 `--permissions` 会拒掉它。
 
 ## 文档
 

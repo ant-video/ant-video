@@ -27,12 +27,13 @@ MAX_TOTAL_SIZE = 100 * 1024 * 1024
 MAX_ENTRY_COUNT = 2000
 
 APP_ID_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$")
-KNOWN_PERMS = ["network", "storage", "ui", "navigate", "player", "source"]
+KNOWN_PERMS = ["network", "storage", "ui", "navigate", "player", "source", "service"]
 
 # ant.<第一段> → 需要的权限。不在表里的第一段不需要权限。
 PERM_OF = {
     "request": "network",
     "requestJson": "network",
+    "requestBytes": "network",
     "storage": "storage",
     "ui": "ui",
     "clipboard": "ui",
@@ -42,6 +43,7 @@ PERM_OF = {
     "exitMiniApp": "navigate",
     "player": "player",
     "source": "source",
+    "serve": "service",
 }
 # 允许 ant 与 . 之间换行：prettier 会把链式调用写成 `ant\n  .request({...})`。
 ANT_REF_RE = re.compile(r"\bant\s*\.\s*(\w+)(?:\s*\.\s*(\w+))?\s*(\()?")
@@ -354,6 +356,13 @@ def scan(root, files, manifest, report):
         report.warn("UNUSED_PERMISSION", f'声明了 "{perm}" 但代码里没用到，按需申请')
     if uses_invoke:
         report.warn("RAW_INVOKE", "用了 ant.invoke()，静态推断不出它需要哪些权限，请自行核对")
+    # service 是唯一会改变实例生命周期的权限，值得单独说一句。
+    if "service" in declared:
+        report.note(
+            "声明了 service：宿主会在用户没打开小程序时把它后台拉起，handler 必须能在页面"
+            "不可见时工作（别依赖 requestAnimationFrame / DOM / 用户点击）；"
+            "dev server 实例没有 loopback 服务，这部分只能装成 zip 之后验",
+        )
 
     for rel in dict.fromkeys(abs_refs):
         report.error(
@@ -386,7 +395,11 @@ def scan(root, files, manifest, report):
             )
     blocked = sorted(h for h in hosts if is_blocked_host(h))
     if blocked:
-        report.warn("FORBIDDEN_HOST", f"代码里有回环/内网地址：{blocked[:5]}，ant.request 打过去一律失败")
+        hint = "，ant.request 打过去一律失败"
+        if "service" in declared:
+            # 服务型小程序常常要合成一个喂给自己 handler 的 URL，那种回环地址是正常的。
+            hint += "；如果只是喂给自己 ant.serve handler 的合成地址，可以忽略"
+        report.warn("FORBIDDEN_HOST", f"代码里有回环/内网地址：{blocked[:5]}{hint}")
 
 
 def main(argv):

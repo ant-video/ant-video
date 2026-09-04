@@ -19,7 +19,7 @@ from pathlib import Path
 SKILL_DIR = Path(__file__).resolve().parent.parent
 TEMPLATE_DIR = SKILL_DIR / "assets" / "template"
 MOCK_FILE = SKILL_DIR / "assets" / "ant-mock.js"
-KNOWN_PERMS = ["network", "storage", "ui", "navigate", "player", "source"]
+KNOWN_PERMS = ["network", "storage", "ui", "navigate", "player", "source", "service"]
 APP_ID_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$")
 
 

@@ -136,10 +136,11 @@ Android 分区存储下拿到的路径常常读不了，那边还是用 zip。
 |---|---|
 | `ui` | `ant.ui.*`、`ant.clipboard.*` |
 | `storage` | `ant.storage.*` |
-| `network` | `ant.request`、`ant.requestJson` |
+| `network` | `ant.request`、`ant.requestJson`、`ant.requestBytes` |
 | `navigate` | `ant.navigateTo` / `redirectTo` / `navigateBack` / `exitMiniApp` |
 | `player` | `ant.player.*` |
 | `source` | `ant.source.*` |
+| `service` | `ant.serve`（见 4.10） |
 
 `ant.env.getSystemInfo()` 和 `ant.log()` 不需要任何权限。
 
@@ -147,7 +148,8 @@ Android 分区存储下拿到的路径常常读不了，那边还是用 zip。
 
 没声明就调用会 reject 一个 `code === 'PERMISSION_DENIED'` 的 Error。
 
-**按需申请**：声明了但没用的权限只会让用户对你的小程序更警惕。
+**按需申请**：声明了但没用的权限只会让用户对你的小程序更警惕。`service` 尤其要慎重——
+声明了它的小程序会被宿主在用户没打开它的时候后台拉起。
 
 ## 4. SDK 参考
 
@@ -173,9 +175,12 @@ const res = await ant.request({
   method: 'GET',          // GET/POST/PUT/DELETE/HEAD/PATCH
   headers: { 'User-Agent': 'my-app' },
   data: { page: 1 },      // POST 等方法的 body
-  timeout: 8000           // ms，上限 30000
+  timeout: 8000,          // ms，上限 30000
+  responseType: 'text',   // 'text'（缺省）| 'base64'
+  followRedirects: true   // false 时不跟随，自己读 302 的 Location
 });
-// { statusCode: 200, headers: {...}, data: '原始响应字符串' }
+// { statusCode: 200, headers: {...}, data: '原始响应字符串',
+//   responseType: 'text', url: '重定向后的最终地址' }
 
 const json = await ant.requestJson({ url: '...' });   // 非 2xx 或非法 JSON 会 reject
 ```
@@ -183,6 +188,17 @@ const json = await ant.requestJson({ url: '...' });   // 非 2xx 或非法 JSON 
 请求走宿主的 HTTP 客户端，**不受浏览器 CORS 限制**——这是相对纯 H5 的最大优势。
 
 限制：只允许 http/https；不允许访问 `localhost`、`127.x`、`10.x`、`172.16-31.x`、`192.168.x`、`169.254.x` 等回环与内网地址；响应体上限 10MB；`host`、`content-length`、`connection` 三个请求头不允许自定义。
+
+**二进制响应**要显式要：
+
+```js
+const bytes = await ant.requestBytes({ url: '...' });        // → Uint8Array
+const res = await ant.request({ url: '...', responseType: 'base64' });
+const same = ant.base64ToBytes(res.data);                    // 手工转换
+```
+
+缺省的 `'text'` 会让宿主按响应头里的 charset 解码，protobuf、gzip/brotli、GBK 网页经此
+一遭就毁了。`byteLength` 是原始字节数，10MB 上限按它算（base64 串本身会大 4/3）。
 
 ### 4.3 存储
 
@@ -242,6 +258,13 @@ await ant.exitMiniApp();                      // 关掉整个小程序
 ```js
 await ant.player.open({ url: 'https://.../movie.m3u8', title: '片名' });
 
+// 需要鉴权/防盗链的源：带上取流请求头
+await ant.player.open({
+  url: 'https://.../movie.m3u8',
+  title: '片名',
+  headers: { Referer: 'https://site.com/', 'User-Agent': 'Mozilla/5.0', Cookie: 'sid=...' }
+});
+
 const state = await ant.player.getState();
 // { active:false } 或 { active:true, playing, position, duration }（毫秒）
 
@@ -250,7 +273,16 @@ ant.player.onClose(() => console.log('用户退出播放页了'));
 off();   // 取消监听
 ```
 
-**当前只支持 `url` 和 `title`**。自定义请求头、外挂字幕暂不支持。播放是整页跳转，退出后回到小程序（会收到 `player.close`）。
+`headers` 会一路带到播放器内核和 M3U8 代理（分片取流也带），`ant.source.play()` 返回的 `header` 可以直接原样传进来（单数字段名也认）：
+
+```js
+const play = await ant.source.play({ siteKey, flag: '', id: 'xxx' });
+await ant.player.open({ url: play.url, title: '片名', headers: play.header });
+```
+
+限制：最多 32 条，单个值最长 8192 字符，`Host` / `Content-Length` / `Connection` 会被丢弃（由播放器自己算）。超限报 `INVALID_PARAMS`。
+
+外挂字幕暂不支持。播放是整页跳转，退出后回到小程序（会收到 `player.close`）。
 
 ### 4.7 采集源
 
@@ -273,7 +305,7 @@ const found  = await ant.source.search({ siteKey, wd: '关键词', page: 1 });
 注意：
 - 用户可能一个站点都没配，`list()` 返回空数组要处理
 - 单次调用超时 60s，同时最多 3 个在飞，超了 reject `TOO_MANY_REQUESTS`
-- 拿到 `play` 的地址后接 `ant.player.open()` 就是一条完整的看片链路
+- 拿到 `play` 的地址后接 `ant.player.open()` 就是一条完整的看片链路；`play.header` 一起传过去，鉴权源才播得动
 
 ### 4.8 事件与生命周期
 
@@ -317,6 +349,74 @@ ant.tv.onKey(e => {
 button:focus-visible { outline: 3px solid #ffb020; outline-offset: 2px; }
 ```
 
+### 4.10 反向服务：让宿主调你
+
+需要 `service` 权限。用 `ant.serve` 注册一个 HTTP 处理器，宿主自己的代码就能把你这段 JS
+当本地服务用——播放器的弹幕源就是这么接的。
+
+```js
+ant.serve(async (req) => {
+  // req = { method, path, query, params, headers, body, url }
+  if (req.path === '/api/v2/search/episodes') {
+    const data = await search(req.params.anime, req.params.episode);
+    return {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    };
+  }
+  return { status: 404, body: 'not found' };
+});
+```
+
+`req.path` 已经剥掉了宿主的令牌与 `__service` 前缀，是干净的业务路径；`req.url` 是拼好的
+完整地址，写成 Cloudflare Worker 那种风格的服务可以直接 `new URL(req.url)`。
+
+返回值三种写法都认：标准 `Response` 对象、`{status, headers, body}`（二进制放
+`bodyBase64`）、或者一个字符串（当 200 text）。返回 `null` 宿主会收到 503。
+
+宿主侧用 **`miniapp://<appId>[/path]`** 引用你的服务。真地址里的端口和令牌每次启动都不
+一样，所以设置里存的是这个逻辑地址，用的时候才解析。解析时宿主会：
+
+1. 没跑就**后台拉起**你的小程序，用户不需要先手动打开；
+2. 等 `ant.serve` 注册好（页面脚本跑完）再发第一个请求；
+3. 之后 WebView 一直挂在屏幕外，JS、定时器、`ant.request` 全都照常。
+
+要注意的：
+
+- handler 必须能在**页面不可见**时工作。别依赖 `requestAnimationFrame`、别等用户点击、
+  别把状态只存在 DOM 里。
+- 单次调用 60s 超时，请求体上限 1MB。
+- 同时保活的实例上限是 3 个，超了要回收；声明了 `service` 的实例排在最后被回收，
+  不会被用户随手打开的小程序挤掉。
+- 用户在小程序中心手动结束它，服务就断了——弹幕这类调用方会退化成「没有可用源」。
+
+现成的例子：`danmu_api` 仓库的 `miniapp/`（`build-miniapp.js` 打包），把整个弹幕聚合
+服务塞进小程序，播放器把弹幕 API 填成 `miniapp://com.logvar.danmu` 就能用。
+
+#### 共享到局域网
+
+小程序详情页里有个「局域网共享」开关（默认关，只对声明了 `service` 的小程序显示）；
+「小程序设置 → 局域网共享」里也有一份，那一页能一眼看全所有服务的开关和地址。开了之后宿主
+会另起一个绑在 `0.0.0.0:9321` 的服务，把请求转发到你的 handler，地址形如：
+
+```
+http://192.168.1.7:9321/<lanToken>
+```
+
+同一网络里的别的设备（另一台装着本 app 的电视、第三方播放器）填这个地址就能共用一份服务。
+几点要知道：
+
+- **多个服务可以同时开**：共用同一个端口（防火墙只放行一个就够），靠地址里的 token 区分。
+  token 互不相同，泄露一个不影响别的服务，单独重置某一个也不动其它。
+- 地址里的 `lanToken` 是**持久化**的，重启后不变——不然别的设备每次都要重配。
+  「重置地址」会换掉它，已经发出去的旧地址立刻失效。
+- 只有 `__service` 被暴露，**包内文件一个都碰不到**；来源 IP 不是私有网段直接 403。
+- 这个 token 就是唯一凭证。公共 WiFi 下开等于把你这个服务的能力（包括它的
+  `ant.request` 出网能力）交给同网段所有人。
+- 服务自己那一层的鉴权照常生效——比如 danmu_api 改过 `TOKEN` 的话，路径要写成
+  `http://IP:9321/<lanToken>/<你的TOKEN>/api/v2/…`。
+
 ## 5. 打包与发版
 
 ```bash
@@ -332,7 +432,7 @@ zip -r ../my-app-v2.zip . -x '.*' -x '__MACOSX*'
 
 ## 6. 分发给别人（市场 JSON）
 
-把 zip 传到任何能直链下载的地方，再提供一个 JSON 列表地址，用户在「市场」Tab 填这个地址即可：
+把 zip 传到任何能直链下载的地方，再提供一个 JSON 列表地址，用户在「市场」Tab 把地址换成你的即可（该 Tab 默认填的是宿主内置的官方市场，清空后点「加载」会恢复成它）：
 
 ```json
 {

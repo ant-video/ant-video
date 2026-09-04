@@ -52,7 +52,21 @@ npx vite            # 有构建流程时
 ```js
 /*!
  * ant-mock.js —— 浏览器里的 window.ant 模拟实现，仅用于开发。
- * 宿主容器会在 document-start 注入真 SDK，此时本文件自动退让。
+ *
+ * 宿主容器会在 document-start 注入真 SDK，此时本文件自动退让，
+ * 所以打包时留着无害（只多几 KB）。
+ *
+ * 引入前可设置这几个全局变量来配置行为：
+ *   window.__antMockPermissions = ['ui','storage']   // 与 manifest.permissions 保持一致
+ *   window.__antMockAppId       = 'com.foo.bar'
+ *   window.__antMockTV          = false              // true 时 isTV 为真
+ *   window.__antMockFixtures    = { sites:[], search:{list:[]}, play:{url:''} }
+ *
+ * 浏览器里没有宿主，所以 `ant.serve` 注册的 handler 只是挂到 `window.__antServe`
+ * 上，自己在 devtools 里调它验证：
+ *   await __antServe({ method:'GET', path:'/api/v2/x', query:'a=1',
+ *                      params:{a:'1'}, headers:{}, body:null,
+ *                      url: location.origin + '/api/v2/x?a=1' })
  */
 (function () {
   'use strict';
@@ -112,7 +126,7 @@ npx vite            # 有构建流程时
   var loadingEl = null;
 
   window.ant = {
-    version: 1,
+    version: 2,
     mock: true,
 
     invoke: function (api, params) {
@@ -133,7 +147,7 @@ npx vite            # 有构建流程时
           appVersionCode: 0,
           devMode: true,
           permissions: declared || [],
-          sdkVersion: 1,
+          sdkVersion: 2,
           mock: true
         });
       }
@@ -141,20 +155,35 @@ npx vite            # 有构建流程时
 
     log: function (m) { console.log('[ant.log]', m); return Promise.resolve(); },
 
-    /* 浏览器里走 fetch —— 会受 CORS 限制，真机不会，见文档第 2.5 节 */
+    /* 浏览器里走 fetch —— 会受 CORS 限制，真机不会 */
     request: function (options) {
       var o = typeof options === 'string' ? { url: options } : (options || {});
       var denied = need('network');
       if (denied) return denied;
+      var wantsBytes = o.responseType === 'base64';
       var init = { method: o.method || 'GET', headers: o.headers || undefined };
+      if (o.redirect === 'manual' || o.followRedirects === false) {
+        init.redirect = 'manual';
+      }
       if (o.data !== undefined && init.method !== 'GET' && init.method !== 'HEAD') {
         init.body = typeof o.data === 'string' ? o.data : JSON.stringify(o.data);
       }
       return fetch(o.url, init).then(function (res) {
-        return res.text().then(function (text) {
-          var headers = {};
-          res.headers.forEach(function (v, k) { headers[k] = [v]; });
-          return { statusCode: res.status, headers: headers, data: text };
+        var headers = {};
+        res.headers.forEach(function (v, k) { headers[k] = [v]; });
+        var body = wantsBytes
+          ? res.arrayBuffer().then(function (buffer) {
+              return window.ant.bytesToBase64(new Uint8Array(buffer));
+            })
+          : res.text();
+        return body.then(function (data) {
+          return {
+            statusCode: res.status,
+            headers: headers,
+            data: data,
+            responseType: wantsBytes ? 'base64' : 'text',
+            url: res.url
+          };
         });
       }).catch(function (e) {
         return fail('REQUEST_FAILED', String(e && e.message || e));
@@ -169,6 +198,67 @@ npx vite            # 有构建流程时
         }
         return JSON.parse(res.data);
       });
+    },
+    requestBytes: function (options) {
+      var o = typeof options === 'string' ? { url: options } : (options || {});
+      o.responseType = 'base64';
+      return window.ant.request(o).then(function (res) {
+        return window.ant.base64ToBytes(res.data);
+      });
+    },
+    base64ToBytes: function (base64) {
+      var binary = atob(base64 || '');
+      var bytes = new Uint8Array(binary.length);
+      for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return bytes;
+    },
+    /** mock 专用：真机上宿主直接给 base64，浏览器里要自己编。 */
+    bytesToBase64: function (bytes) {
+      var binary = '';
+      var chunk = 0x8000;
+      for (var i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+      }
+      return btoa(binary);
+    },
+
+    /**
+     * 注册宿主可调用的处理器。
+     *
+     * 浏览器里没有宿主，所以只把 handler 挂到 `window.__antServe` 上，
+     * 你可以在 devtools 里手动调它来验证：
+     *   await __antServe({ method: 'GET', path: '/api/v2/search/anime',
+     *                      query: 'keyword=x', params: { keyword: 'x' },
+     *                      headers: {}, body: null,
+     *                      url: location.origin + '/api/v2/search/anime?keyword=x' })
+     */
+    serve: function (handler) {
+      var denied = need('service');
+      if (denied) return function () {};
+      window.__antServe = function (payload) {
+        return Promise.resolve()
+          .then(function () { return handler(payload || {}); })
+          .then(function (res) {
+            if (res === null || res === undefined) return null;
+            if (typeof res === 'string') return { status: 200, headers: {}, body: res };
+            if (typeof Response !== 'undefined' && res instanceof Response) {
+              var headers = {};
+              res.headers.forEach(function (v, k) { headers[k] = v; });
+              var status = res.status;
+              return res.text().then(function (body) {
+                return { status: status, headers: headers, body: body };
+              });
+            }
+            return {
+              status: res.status || res.statusCode || 200,
+              headers: res.headers || {},
+              body: res.body,
+              bodyBase64: res.bodyBase64
+            };
+          });
+      };
+      console.log('[ant.serve] 已注册处理器，devtools 里可以直接调 __antServe(...)');
+      return function () { window.__antServe = null; };
     },
 
     storage: {
@@ -249,6 +339,11 @@ npx vite            # 有构建流程时
       open: function (options) {
         var o = typeof options === 'string' ? { url: options } : (options || {});
         var denied = need('player'); if (denied) return denied;
+        var headers = o.headers || o.header;
+        if (headers && Object.keys(headers).length) {
+          /* <video src> 发不出自定义头，真机上宿主会带上，浏览器里只能提示 */
+          console.warn('[ant-mock] player.open 的 headers 在浏览器里无法生效（真机宿主会带上）:', Object.keys(headers).join(', '));
+        }
         emit('player.open', { url: o.url, title: o.title || o.url });
 
         var wrap = document.createElement('div');
@@ -296,7 +391,7 @@ npx vite            # 有构建流程时
       onClose: function (h) { return on('player.close', h); }
     },
 
-    /* 采集源没法模拟，返回你自己准备的假数据 */
+    /* 采集源没法模拟，返回 window.__antMockFixtures 里你自己准备的假数据 */
     source: (function () {
       function fx(name, fallback) {
         var all = window.__antMockFixtures || {};
@@ -435,12 +530,15 @@ export default {
 | 权限 | 全开，不检查 | 按 manifest 声明检查（声明了即放行，无二次确认） |
 | appId | 固定 `dev.playground` | 你的 `appId` |
 | `ant.storage` | 存在 `dev.playground` 分区 | 存在自己的分区 |
+| 本地服务 | **没有** | 有，`ant.serve` 与 `miniapp://` 靠它 |
 | 标识 | 顶部橙色横幅 | 无 |
 
-两个直接后果：
+三个直接后果：
 
 - **调试模式验证不了权限声明**。这就是建议在 mock 里配 `__antMockPermissions` 的原因。
 - **调试期存的数据，正式安装后读不到**（分区不同）。别拿调试期的数据当测试基线。
+- **`ant.serve` 在调试模式下测不了**：调试实例不起本地服务，宿主没有可回调的入口。
+  服务型小程序那部分只能装成 zip 之后验。
 
 ### 3.3 改代码后怎么刷新
 
@@ -510,10 +608,13 @@ cd dist && zip -r ../my-app.zip . && cd ..
 | `ant.request` CORS | 受限 | 不受限 |
 | `ant.request` 内网地址 | 能打通 | `FORBIDDEN_HOST` |
 | `ant.request` 域名白名单 | 不检查 | 检查 `network.allowlist` |
+| `ant.request` 二进制 | `responseType:'base64'` 走 `arrayBuffer` 自己编码 | 宿主直接给 base64 |
 | 权限门禁 | 只在配了 `__antMockPermissions` 时检查 | 始终按 manifest 声明检查 |
 | `ant.storage` | `localStorage`，容量按浏览器 | 文件，5MB 配额，超限 `QUOTA_EXCEEDED` |
 | `ant.player.open` | 页面内 `<video>` | 跳宿主全屏播放页（含 M3U8 代理与去广告） |
 | `ant.source.*` | 你给的假数据 | 真站点，慢且可能失败 |
+| `ant.serve` | 只把 handler 挂到 `window.__antServe`，自己在 devtools 里调 | 宿主的本地服务真的会打进来；**dev server 实例没有这条通道** |
+| 后台运行 | 浏览器标签页节流 | 离屏但留在树里，JS 与定时器照常 |
 | `ant.navigateBack` | `history.back()` | WebView 历史；没有历史时返回 `{moved:false}` 并由容器接管退出 |
 | `ant.exitMiniApp` | 无操作 | 真的关掉小程序 |
 | 安全区 | 无 | 有，需要 `env(safe-area-inset-*)` |

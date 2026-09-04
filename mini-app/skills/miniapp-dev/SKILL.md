@@ -1,6 +1,6 @@
 ---
 name: miniapp-dev
-description: 为本宿主（flutter_ant_video）开发、调试、打包 HTML/JS/CSS 小程序时使用。提供脚手架、浏览器 mock SDK、预检校验与打包脚本。触发词：小程序 / miniapp / mini app、ant.storage、ant.player、ant.source、ant.request、ant.tv.onKey、manifest.json 里的 appId / versionCode / permissions / network.allowlist、PERMISSION_DENIED、HOST_NOT_ALLOWED、MISSING_MANIFEST、ENTRY_MISSING、小程序白屏、ant-mock.js、宿主调试模式 / dev server。
+description: 为本宿主（flutter_ant_video）开发、调试、打包 HTML/JS/CSS 小程序时使用。提供脚手架、浏览器 mock SDK、预检校验与打包脚本。触发词：小程序 / miniapp / mini app、ant.storage、ant.player、ant.source、ant.request、ant.serve、ant.tv.onKey、responseType / 二进制响应、manifest.json 里的 appId / versionCode / permissions / network.allowlist、service 权限 / 反向服务、miniapp:// 地址、局域网共享、PERMISSION_DENIED、HOST_NOT_ALLOWED、MISSING_MANIFEST、ENTRY_MISSING、小程序白屏、ant-mock.js、宿主调试模式 / dev server。
 ---
 
 # 小程序开发（flutter_ant_video 宿主）
@@ -38,7 +38,7 @@ python3 "$SKILL/scripts/new_miniapp.py" \
 
 生成 `manifest.json` / `index.html` / `app.js` / `style.css` / `ant-mock.js`，硬规则（相对路径、
 `body` 背景、安全区、深色模式、TV 遥控焦点、mock 权限自检）已经预置好，直接往上写业务。
-`--permissions ui,storage,network,player,source,navigate` 可指定权限，缺省 `ui,storage`。
+`--permissions ui,storage,network,player,source,navigate,service` 可指定权限，缺省 `ui,storage`。
 
 不用脚手架就手写时，模板在 `$SKILL/assets/template/`，逐条对齐第 4 节硬规则。
 
@@ -74,6 +74,9 @@ SDK 会自动退让，所以**打包时留着无害**。采集源没法模拟，
 
 **调试模式权限全开且完全不读 manifest**，所以它验证不了权限声明和安装校验——这两项靠第 5 节的预检。
 
+**服务型小程序（`ant.serve`）在调试模式下测不了**：dev server 实例没有 loopback 服务，宿主
+没有可回调的入口。那部分只能装成 zip 之后验，见第 7.1 节。
+
 ## 4. 硬规则（违反了会静默失败，逐条核对）
 
 | 规则 | 违反后的现象 |
@@ -86,12 +89,13 @@ SDK 会自动退让，所以**打包时留着无害**。采集源没法模拟，
 | 持久化用 `ant.storage`，别用 `localStorage` | 每次启动 origin 端口都变，`localStorage` 不保证保留 |
 | 每次发版 `versionCode` +1 | 装了新版打开还是老的 |
 | `network.allowlist` 写了就要覆盖全部域名（不写＝`ant.request` 不限制，但**导航只剩同源**；导航不认 `*`） | `HOST_NOT_ALLOWED`；点站内链接弹「离开小程序」 |
+| 用了 `ant.serve` 就别依赖 DOM/动画/用户点击 | 宿主会在页面不可见时后台拉起你，那时 `requestAnimationFrame` 被节流、没人点按钮 |
 | 构建工具设 `base: './'`（Vite）/ `publicPath: './'`，路由用 hash 模式 | 白屏；刷新 404 |
 | `viewport-fit=cover` + `env(safe-area-inset-*)` | 刘海屏/手势条被裁 |
 
 改不了的限制：`ant.request` 只允许 http/https，回环与内网地址（`localhost`、`127.x`、`10.x`、
 `172.16-31.x`、`192.168.x`、`169.254.x`）一律 `FORBIDDEN_HOST`；响应体上限 10MB；`ant.storage`
-配额 5MB；采集源单次超时 60s、并发上限 3。
+配额 5MB；采集源单次超时 60s、并发上限 3；`ant.serve` 单次 60s 超时、请求体 ≤1MB。
 
 ### 4.1 在线站点型小程序（包着一个线上站点）
 
@@ -153,21 +157,67 @@ python3 "$SKILL/scripts/pack_miniapp.py"  miniapps/notes   # 预检通过才打�
 ```js
 ant.env.getSystemInfo()                  // {platform,osVersion,isTV,appId,devMode,permissions,sdkVersion}
 ant.log(msg)                             // 免权限；console.* 也会进日志面板
-ant.request({url,method,headers,data,timeout})   // → {statusCode,headers,data:string}  [network]
+ant.request({url,method,headers,data,timeout,responseType,followRedirects})
+                                         // → {statusCode,headers,data,responseType,url}  [network]
 ant.requestJson({url})                   // 非 2xx / 非法 JSON 会 reject          [network]
+ant.requestBytes({url}) · base64ToBytes(s)  // 二进制，→ Uint8Array               [network]
 ant.storage.get/set/getJSON/setJSON/remove/clear/keys()                          [storage]
 ant.ui.toast/loading/hideLoading/confirm({title,content})/actionSheet([...])     [ui]
 ant.clipboard.get/set(text)                                                      [ui]
 ant.navigateTo/redirectTo(url) · navigateBack() · exitMiniApp()                  [navigate]
-ant.player.open({url,title}) · getState() · onStateChange(fn) · onClose(fn)      [player]
+ant.player.open({url,title,headers}) · getState() · onStateChange(fn) · onClose(fn) [player]
 ant.source.list() · home(siteKey) · category({siteKey,tid,page,ext})
          · detail({siteKey,id}) · play({siteKey,flag,id}) · search({siteKey,wd,page})  [source]
+ant.serve(async req => resp)             // 宿主反过来调你，见下                  [service]
 ant.on/off/once(event, fn) · onShow(fn) · onHide(fn) · tv.onKey(fn)
 ```
 
 事件：`app.show`、`app.hide`、`player.open`、`player.stateChange`、`player.close`、`keydown`。
-`ant.player.open` 目前只支持 `url` 和 `title`（无自定义头/外挂字幕），是整页跳转，退出会收到
+`ant.player.open` 的 `headers` 是取流请求头（`source.play` 返回的 `header` 可原样传，单数也认，
+上限 32 条 / 单值 8192 字符）；外挂字幕仍不支持。它是整页跳转，退出会收到
 `player.close`。采集源返回宿主内部的 `vod_*` 蛇形字段；用户可能一个站点都没配，`list()` 要按空数组处理。
+
+`responseType: 'base64'` 才能拿到原始字节（protobuf / gzip / brotli / GBK 网页必须用它，
+缺省的 `'text'` 会让宿主按 charset 解码，二进制经此一遭就毁了）。
+
+### 7.1 `ant.serve`：让宿主反过来调你
+
+需要 `service` 权限。把一段逻辑跑成宿主眼里的**本地 HTTP 服务**——弹幕聚合就是这么接进
+播放器的。
+
+```js
+ant.serve(async (req) => {
+  // req = { method, path, query, params, headers, body, url }
+  if (req.path === '/api/v2/search/episodes') {
+    return { status: 200, headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify(await search(req.params.anime)) };
+  }
+  return { status: 404, body: 'not found' };
+});
+```
+
+`req.path` 已剥掉宿主的令牌与前缀，是干净的业务路径；`req.url` 是拼好的完整地址，
+Worker 风格的代码可以直接 `new URL(req.url)`。返回标准 `Response`、
+`{status,headers,body|bodyBase64}` 或裸字符串都认；返回 `null` 宿主收到 503。
+
+宿主侧用 **`miniapp://<appId>[/path]`** 引用（真地址的端口和令牌每次启动都变，所以存的是
+逻辑地址）。要点：
+
+- 宿主**会在用户没打开小程序时把它后台拉起**，所以 handler 必须能在页面不可见时工作；
+- 单次 60s 超时，请求体 ≤1MB；
+- 服务型实例在保活上限（3 个）里排最后被回收，不会被随手开的小程序挤掉；
+- 用户手动结束实例就断服，调用方按「服务不可用」处理；
+- **dev server 测不了**（没有 loopback 服务），只能装成 zip 验。
+
+**共享到局域网**：小程序详情页、或「小程序设置 → 局域网共享」里可以开（默认关），
+宿主另起一个绑 `0.0.0.0:9321` 的服务，给出 `http://<本机IP>:9321/<lanToken>`：
+
+- 多个服务能同时开，共用这一个端口，靠各自的 token 区分；
+- token 持久化，重启地址不变；「重置地址」换掉它，旧地址立刻失效；
+- 只暴露服务路由，**包内文件碰不到**；来源不是私有网段直接 403；
+- 那个 token 就是唯一凭证，公共 WiFi 下开等于把你的服务（含出网能力）交给同网段所有人。
+
+现成例子：`danmu_api` 仓库的 `miniapp/`（`build-miniapp.js` 打包）。
 
 ## 8. 排查
 
@@ -185,6 +235,10 @@ ant.on/off/once(event, fn) · onShow(fn) · onHide(fn) · tv.onKey(fn)
 | 背景透出宿主壁纸 | 没设 `body { background }` |
 | TV 上遥控完全没反应 | 没实现 `ant.tv.onKey` |
 | 采集源报 `TOO_MANY_REQUESTS` | 并发超过 3，把请求串行化 |
+| 宿主调 `miniapp://` 时报服务不可用 | 没声明 `service`；或没调 `ant.serve`；或页面脚本还没跑完（宿主会等，但有上限）；或用的是 dev server 实例 |
+| `ant.serve` 的 handler 在后台时不干活 | 依赖了 `requestAnimationFrame` / DOM / 用户点击——离屏时这些都不成立 |
+| 局域网地址在别的设备上 404 | token 被「重置地址」换过；或那个小程序的共享已关 |
+| 局域网地址返回 403 | 请求方不在私有网段（走了公网回环、或经过了某种转发） |
 
 其余错误码见 `$SKILL/references/jsapi.md` 的错误码表。
 
@@ -203,4 +257,6 @@ ant.on/off/once(event, fn) · onShow(fn) · onHide(fn) · tv.onKey(fn)
 - `assets/miniapp/ant-sdk.js` 与 `lib/miniapp/bridge/` — 注入的真 SDK 与 Dart 侧实现，行为有疑问时以它们为准
 
 维护提醒：宿主的 `ant-sdk.js` 加了新 API 时，同步更新本 skill 的 `assets/ant-mock.js`、
-`references/jsapi.md` 与 `scripts/check_miniapp.py` 里的 `PERM_OF` 权限映射表。
+`references/jsapi.md`，以及两个脚本里的权限表——`scripts/check_miniapp.py` 的 `KNOWN_PERMS`
+与 `PERM_OF`、`scripts/new_miniapp.py` 的 `KNOWN_PERMS`。加了新权限时别漏 `new_miniapp.py`，
+不然 `--permissions` 会拒掉它。

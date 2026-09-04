@@ -65,6 +65,25 @@ var actions = {
         show('request', 'HTTP ' + res.statusCode + '，响应长度 ' + res.data.length);
       });
   },
+  // 二进制响应：protobuf / gzip / brotli / GBK 网页都得走这条，缺省的
+  // responseType:'text' 会让宿主按 charset 解码，字节经此一遭就毁了。
+  'request-bytes': function () {
+    if (typeof ant.requestBytes !== 'function') {
+      show('requestBytes', '当前宿主的 SDK 版本太低（需要 v2）');
+      return Promise.resolve();
+    }
+    return ant
+      .requestBytes({ url: 'https://www.baidu.com/favicon.ico', timeout: 8000 })
+      .then(function (bytes) {
+        var head = Array.prototype.slice
+          .call(bytes.subarray(0, 4))
+          .map(function (b) {
+            return b.toString(16).padStart(2, '0');
+          })
+          .join(' ');
+        show('requestBytes', bytes.length + ' 字节，前 4 字节 ' + head);
+      });
+  },
   'storage-set': function () {
     return ant.storage
       .setJSON('demo', { at: new Date().toISOString(), n: Math.random() })

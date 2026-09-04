@@ -9,6 +9,12 @@
  *   window.__antMockAppId       = 'com.foo.bar'
  *   window.__antMockTV          = false              // true 时 isTV 为真
  *   window.__antMockFixtures    = { sites:[], search:{list:[]}, play:{url:''} }
+ *
+ * 浏览器里没有宿主，所以 `ant.serve` 注册的 handler 只是挂到 `window.__antServe`
+ * 上，自己在 devtools 里调它验证：
+ *   await __antServe({ method:'GET', path:'/api/v2/x', query:'a=1',
+ *                      params:{a:'1'}, headers:{}, body:null,
+ *                      url: location.origin + '/api/v2/x?a=1' })
  */
 (function () {
   'use strict';
@@ -68,7 +74,7 @@
   var loadingEl = null;
 
   window.ant = {
-    version: 1,
+    version: 2,
     mock: true,
 
     invoke: function (api, params) {
@@ -89,7 +95,7 @@
           appVersionCode: 0,
           devMode: true,
           permissions: declared || [],
-          sdkVersion: 1,
+          sdkVersion: 2,
           mock: true
         });
       }
@@ -102,15 +108,30 @@
       var o = typeof options === 'string' ? { url: options } : (options || {});
       var denied = need('network');
       if (denied) return denied;
+      var wantsBytes = o.responseType === 'base64';
       var init = { method: o.method || 'GET', headers: o.headers || undefined };
+      if (o.redirect === 'manual' || o.followRedirects === false) {
+        init.redirect = 'manual';
+      }
       if (o.data !== undefined && init.method !== 'GET' && init.method !== 'HEAD') {
         init.body = typeof o.data === 'string' ? o.data : JSON.stringify(o.data);
       }
       return fetch(o.url, init).then(function (res) {
-        return res.text().then(function (text) {
-          var headers = {};
-          res.headers.forEach(function (v, k) { headers[k] = [v]; });
-          return { statusCode: res.status, headers: headers, data: text };
+        var headers = {};
+        res.headers.forEach(function (v, k) { headers[k] = [v]; });
+        var body = wantsBytes
+          ? res.arrayBuffer().then(function (buffer) {
+              return window.ant.bytesToBase64(new Uint8Array(buffer));
+            })
+          : res.text();
+        return body.then(function (data) {
+          return {
+            statusCode: res.status,
+            headers: headers,
+            data: data,
+            responseType: wantsBytes ? 'base64' : 'text',
+            url: res.url
+          };
         });
       }).catch(function (e) {
         return fail('REQUEST_FAILED', String(e && e.message || e));
@@ -125,6 +146,67 @@
         }
         return JSON.parse(res.data);
       });
+    },
+    requestBytes: function (options) {
+      var o = typeof options === 'string' ? { url: options } : (options || {});
+      o.responseType = 'base64';
+      return window.ant.request(o).then(function (res) {
+        return window.ant.base64ToBytes(res.data);
+      });
+    },
+    base64ToBytes: function (base64) {
+      var binary = atob(base64 || '');
+      var bytes = new Uint8Array(binary.length);
+      for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return bytes;
+    },
+    /** mock 专用：真机上宿主直接给 base64，浏览器里要自己编。 */
+    bytesToBase64: function (bytes) {
+      var binary = '';
+      var chunk = 0x8000;
+      for (var i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+      }
+      return btoa(binary);
+    },
+
+    /**
+     * 注册宿主可调用的处理器。
+     *
+     * 浏览器里没有宿主，所以只把 handler 挂到 `window.__antServe` 上，
+     * 你可以在 devtools 里手动调它来验证：
+     *   await __antServe({ method: 'GET', path: '/api/v2/search/anime',
+     *                      query: 'keyword=x', params: { keyword: 'x' },
+     *                      headers: {}, body: null,
+     *                      url: location.origin + '/api/v2/search/anime?keyword=x' })
+     */
+    serve: function (handler) {
+      var denied = need('service');
+      if (denied) return function () {};
+      window.__antServe = function (payload) {
+        return Promise.resolve()
+          .then(function () { return handler(payload || {}); })
+          .then(function (res) {
+            if (res === null || res === undefined) return null;
+            if (typeof res === 'string') return { status: 200, headers: {}, body: res };
+            if (typeof Response !== 'undefined' && res instanceof Response) {
+              var headers = {};
+              res.headers.forEach(function (v, k) { headers[k] = v; });
+              var status = res.status;
+              return res.text().then(function (body) {
+                return { status: status, headers: headers, body: body };
+              });
+            }
+            return {
+              status: res.status || res.statusCode || 200,
+              headers: res.headers || {},
+              body: res.body,
+              bodyBase64: res.bodyBase64
+            };
+          });
+      };
+      console.log('[ant.serve] 已注册处理器，devtools 里可以直接调 __antServe(...)');
+      return function () { window.__antServe = null; };
     },
 
     storage: {
@@ -205,6 +287,11 @@
       open: function (options) {
         var o = typeof options === 'string' ? { url: options } : (options || {});
         var denied = need('player'); if (denied) return denied;
+        var headers = o.headers || o.header;
+        if (headers && Object.keys(headers).length) {
+          /* <video src> 发不出自定义头，真机上宿主会带上，浏览器里只能提示 */
+          console.warn('[ant-mock] player.open 的 headers 在浏览器里无法生效（真机宿主会带上）:', Object.keys(headers).join(', '));
+        }
         emit('player.open', { url: o.url, title: o.title || o.url });
 
         var wrap = document.createElement('div');
