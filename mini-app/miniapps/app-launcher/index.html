@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>小程序启动台</title>
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    window.__antMockPermissions = ['ui', 'miniapp'];
+    window.__antMockAppId = 'com.leospring.launcher';
+  </script>
+  <script src="ant-mock.js"></script>
+</head>
+<body>
+  <header>
+    <span class="eyebrow">SDK v3 示例</span>
+    <h1>小程序启动台</h1>
+    <p>目标必须先安装。宿主会显示来源与目标名称，每次都由用户决定是否打开。</p>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <strong>带页面和参数打开</strong>
+        <p>接收器会落到详情页，并展示这次传入的 JSON。</p>
+      </div>
+      <button data-app-id="com.leospring.launch_target"
+              data-path="detail.html?id=42"
+              data-title="跨应用详情">打开接收器详情页</button>
+    </section>
+
+    <section class="cards" aria-label="可打开的小程序">
+      <article>
+        <div class="icon">收</div>
+        <h2>启动参数接收器</h2>
+        <p>不指定 path，若它已在后台则保留原页面并收到新的 onOpen 事件。</p>
+        <button data-app-id="com.leospring.launch_target"
+                data-title="保活页面唤醒">打开或切回</button>
+      </article>
+      <article>
+        <div class="icon blue">链</div>
+        <h2>网页跳转示例</h2>
+        <p>演示容器内页面导航，以及确认后交给系统浏览器的外部链接。</p>
+        <button data-app-id="com.leospring.web_links"
+                data-title="从启动台进入">打开网页示例</button>
+      </article>
+      <article>
+        <div class="icon violet">演</div>
+        <h2>综合示例</h2>
+        <p>回到常用 JSAPI 的按钮面板；目标未安装时会得到明确错误码。</p>
+        <button data-app-id="com.leospring.demo"
+                data-title="启动台快捷入口">打开综合示例</button>
+      </article>
+    </section>
+
+    <section class="result">
+      <div class="result-title">
+        <h2>调用结果</h2>
+        <button class="ghost" data-action="read-options">读取我的启动参数</button>
+      </div>
+      <pre id="output">请选择一个目标。浏览器 mock 只模拟确认与返回值，不会真的切换页面。</pre>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

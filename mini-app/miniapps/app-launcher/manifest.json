@@ -1,0 +1,13 @@
+{
+  "appId": "com.leospring.launcher",
+  "name": "小程序启动台",
+  "version": "1.0.0",
+  "versionCode": 1,
+  "renderer": "webview",
+  "entry": "index.html",
+  "description": "演示 ant.miniApp.open、目标页面与 JSON 启动参数传递",
+  "permissions": [
+    "ui",
+    "miniapp"
+  ]
+}

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>容器内第二页</title>
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    window.__antMockPermissions = ['ui', 'navigate'];
+    window.__antMockAppId = 'com.leospring.web_links';
+  </script>
+  <script src="ant-mock.js"></script>
+</head>
+<body>
+  <main class="second">
+    <header>
+      <span>同源页面</span>
+      <h1>仍在小程序容器里</h1>
+      <p>地址保留宿主生成的随机端口与令牌，返回键会优先走 WebView 历史。</p>
+    </header>
+    <section class="single">
+      <button data-action="back">ant.navigateBack()</button>
+      <button class="soft" data-action="toast">验证 SDK 仍可用</button>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

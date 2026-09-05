@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>CMS 转 T4 服务</title>
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    window.__antMockPermissions = ['ui', 'storage', 'network', 'service'];
+    window.__antMockAppId = 'com.leospring.cms_t4_bridge';
+  </script>
+  <script src="ant-mock.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <span class="eyebrow">SERVICE BRIDGE</span>
+      <h1>CMS 转 T4 服务</h1>
+      <p>配置多个标准 CMS JSON 接口，宿主会在后台提供按站点区分的 T4 兼容首页、分类、搜索和详情服务。</p>
+    </header>
+
+    <section class="panel">
+      <div class="panel-head"><h2 id="site-editor-title">添加站点</h2></div>
+      <label>
+        <span>站点 key</span>
+        <input id="key" type="text" maxlength="40" placeholder="例如：souav" autocomplete="off" />
+      </label>
+      <label>
+        <span>服务名称</span>
+        <input id="name" type="text" maxlength="80" placeholder="例如：我的影视源" />
+      </label>
+      <label>
+        <span>CMS JSON 接口</span>
+        <input id="url" type="url" inputmode="url" placeholder="https://example.com/api.php/provide/vod/" />
+      </label>
+      <div class="actions">
+        <button data-focus class="primary" id="save">添加 / 更新站点</button>
+        <button data-focus id="test">测试接口</button>
+        <button data-focus class="quiet" id="reset">清除配置</button>
+      </div>
+      <p id="status" class="status">服务启动后会自动注册，无需保持页面在前台。添加站点后可在其它应用中使用带 site 参数的 miniapp:// 地址。</p>
+      <div id="site-list" class="site-list"></div>
+    </section>
+
+    <section class="panel output-panel">
+      <div class="panel-head">
+        <h2>对外配置</h2>
+        <button data-focus class="copy" id="copy">复制 JSON</button>
+      </div>
+      <pre id="config-output">尚未配置</pre>
+      <p class="hint">每个站点的 T4 地址形如：<code>miniapp://com.leospring.cms_t4_bridge?site=souav</code></p>
+    </section>
+
+    <section class="panel endpoints">
+      <h2>接口路径</h2>
+      <div class="endpoint"><code>GET /?site=souav&amp;filter=true</code><span>首页与分类</span></div>
+      <div class="endpoint"><code>GET /?site=souav&amp;t=1&amp;ac=videolist&amp;pg=1</code><span>分类列表</span></div>
+      <div class="endpoint"><code>GET /?site=souav&amp;wd=关键词&amp;pg=1</code><span>搜索</span></div>
+      <div class="endpoint"><code>GET /?site=souav&amp;ac=detail&amp;ids=影片ID</code><span>详情</span></div>
+      <div class="endpoint"><code>GET /?site=souav&amp;flag=线路&amp;play=播放地址</code><span>播放</span></div>
+      <div class="endpoint"><code>GET /config</code><span>多站点应用配置描述</span></div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

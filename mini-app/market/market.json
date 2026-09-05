@@ -14,22 +14,77 @@
     {
       "appId": "com.leospring.emby",
       "name": "影视库",
-      "version": "1.0.0",
-      "versionCode": 1,
+      "version": "1.0.1",
+      "versionCode": 2,
       "url": "https://ghfast.top/https://raw.githubusercontent.com/ant-video/ant-video/refs/heads/main/mini-app/market/zip/emby.zip",
+      "md5": "6412905794af59f78a85e26fbe167456",
+      "size": 19553,
       "author": "leospring",
       "description": "Emby 风格的影视浏览器：复用宿主已配置的采集源，支持首页推荐、分类浏览、搜索、详情选集与续播"
     },
     {
       "appId": "com.leospring.demo",
       "name": "示例小程序",
-      "version": "1.1.0",
-      "versionCode": 2,
-      "url": "https://ghfast.top/https://raw.githubusercontent.com/ant-video/ant-video/refs/heads/main/mini-app/market/zip/demo-v2.zip",
-      "md5": "e33bc26061739b76e7fb7c849e692a7f",
-      "size": 5003,
+      "version": "1.2.0",
+      "versionCode": 3,
+      "url": "https://ghfast.top/https://raw.githubusercontent.com/ant-video/ant-video/refs/heads/main/mini-app/market/zip/demo-v3.zip",
+      "md5": "6d60004ce6f51dafc6b3f2bd5d2e3d76",
+      "size": 10929,
       "author": "leospring",
-      "description": "演示 ant.* 全部 JSAPI 的示例，可作为开发模板（ant.serve 见市场里的弹幕服务）"
+      "description": "演示 SDK v3 常用 ant.* JSAPI，包含二进制请求、播放器、采集源与跨小程序打开"
+    },
+    {
+      "appId": "com.leospring.launch_target",
+      "name": "启动参数接收器",
+      "version": "1.0.0",
+      "versionCode": 1,
+      "url": "https://ghfast.top/https://raw.githubusercontent.com/ant-video/ant-video/refs/heads/main/mini-app/market/zip/launch-target-v1.zip",
+      "md5": "a1419656f22e0639d0e62c5fcbf534aa",
+      "size": 10433,
+      "author": "leospring",
+      "description": "跨小程序接收端：演示 onOpen、getLaunchOptions、保活复用、指定页面落地和启动历史"
+    },
+    {
+      "appId": "com.leospring.launcher",
+      "name": "小程序启动台",
+      "version": "1.0.0",
+      "versionCode": 1,
+      "url": "https://ghfast.top/https://raw.githubusercontent.com/ant-video/ant-video/refs/heads/main/mini-app/market/zip/app-launcher-v1.zip",
+      "md5": "3798b7df002a577b0f43bd1804016008",
+      "size": 9846,
+      "author": "leospring",
+      "description": "跨小程序发起端：演示用户确认、未安装错误、目标 path 与 JSON params；请先安装启动参数接收器"
+    },
+    {
+      "appId": "com.leospring.web_links",
+      "name": "网页跳转示例",
+      "version": "1.0.0",
+      "versionCode": 1,
+      "url": "https://ghfast.top/https://raw.githubusercontent.com/ant-video/ant-video/refs/heads/main/mini-app/market/zip/web-links-v1.zip",
+      "md5": "cb18ff210fd64dd63632075f6415839c",
+      "size": 9425,
+      "author": "leospring",
+      "description": "演示容器内同源导航，以及经用户确认后用系统浏览器打开外部 HTTPS 网站"
+    },
+    {
+      "appId": "com.leospring.online_site",
+      "name": "在线站点示例",
+      "version": "1.0.0",
+      "versionCode": 1,
+      "url": "https://ghfast.top/https://raw.githubusercontent.com/ant-video/ant-video/refs/heads/main/mini-app/miniapps/online-site/manifest.json",
+      "author": "leospring",
+      "description": "manifest-only 在线站点型小程序，直接打开 HTTPS 页面并使用宿主广告过滤"
+    },
+    {
+      "appId": "com.leospring.cms_t4_bridge",
+      "name": "CMS 转 T4 服务",
+      "version": "1.2.0",
+      "versionCode": 6,
+      "url": "https://ghfast.top/https://raw.githubusercontent.com/ant-video/ant-video/refs/heads/main/mini-app/market/zip/cms-t4-bridge-v2.zip",
+      "md5": "499a196901e2d298c3ec2a7ae2e25607",
+      "size": 13827,
+      "author": "leospring",
+      "description": "配置多个 CMS JSON 接口并转换为可供其它应用使用的 T4 兼容服务"
     },
     {
       "appId": "com.leospring.tetris",

@@ -2,7 +2,7 @@
 
 宿主是个 Flutter 应用，编译一次几分钟，打包安装一次也要十几秒。**不要在宿主里写代码**。这篇讲怎么在浏览器里把小程序写完，最后才进宿主验收。
 
-配套文档：[开发引导](miniapp-developer-guide.md) · [JSAPI 参考](../skills/miniapp-dev/references/jsapi.md)（技术设计文档在宿主仓库 `docs/miniapp/` 下）
+配套文档：[开发引导](miniapp-developer-guide.md) · [技术设计](2026-09-01-miniapp-design.md)
 
 ---
 
@@ -60,6 +60,7 @@ npx vite            # 有构建流程时
  *   window.__antMockPermissions = ['ui','storage']   // 与 manifest.permissions 保持一致
  *   window.__antMockAppId       = 'com.foo.bar'
  *   window.__antMockTV          = false              // true 时 isTV 为真
+ *   window.__antMockLaunchOptions = { sourceAppId:'com.foo.source', params:{} }
  *   window.__antMockFixtures    = { sites:[], search:{list:[]}, play:{url:''} }
  *
  * 浏览器里没有宿主，所以 `ant.serve` 注册的 handler 只是挂到 `window.__antServe`
@@ -74,6 +75,7 @@ npx vite            # 有构建流程时
 
   var listeners = {};
   var KEY_PREFIX = 'ant-mock:';
+  var miniAppLaunchOptions = window.__antMockLaunchOptions || null;
 
   function on(event, handler) {
     if (typeof handler !== 'function') return function () {};
@@ -92,6 +94,7 @@ npx vite            # 有构建流程时
     return dispose;
   }
   function emit(event, data) {
+    if (event === 'miniApp.open') miniAppLaunchOptions = data || null;
     (listeners[event] || []).slice().forEach(function (fn) {
       try { fn(data); } catch (e) { console.error('[ant-mock] ' + event, e); }
     });
@@ -126,7 +129,7 @@ npx vite            # 有构建流程时
   var loadingEl = null;
 
   window.ant = {
-    version: 2,
+    version: 3,
     mock: true,
 
     invoke: function (api, params) {
@@ -147,7 +150,7 @@ npx vite            # 有构建流程时
           appVersionCode: 0,
           devMode: true,
           permissions: declared || [],
-          sdkVersion: 2,
+          sdkVersion: 3,
           mock: true
         });
       }
@@ -331,6 +334,24 @@ npx vite            # 有构建流程时
     navigateBack: function () { history.back(); return Promise.resolve({ moved: true }); },
     exitMiniApp: function () { console.warn('[ant-mock] exitMiniApp（浏览器里无操作）'); return Promise.resolve(); },
 
+    miniApp: {
+      open: function (options) {
+        var o = typeof options === 'string' ? { appId: options } : (options || {});
+        var denied = need('miniapp'); if (denied) return denied;
+        var opened = window.confirm('模拟打开小程序：' + (o.appId || ''));
+        if (opened) console.warn('[ant-mock] 浏览器里不会真的切换小程序');
+        return Promise.resolve({
+          opened: opened,
+          appId: o.appId,
+          name: o.appId,
+          resumed: false,
+          path: o.path
+        });
+      },
+      getLaunchOptions: function () { return Promise.resolve(miniAppLaunchOptions); },
+      onOpen: function (h) { return on('miniApp.open', h); }
+    },
+
     onShow: function (h) { return on('app.show', h); },
     onHide: function (h) { return on('app.hide', h); },
 
@@ -449,10 +470,11 @@ npx vite            # 有构建流程时
 <script>
   // 让 mock 也做权限检查，值要和 manifest.permissions 保持一致。
   // 不设置则不检查——建议设置，否则真机上才发现漏声明。
-  window.__antMockPermissions = ['ui', 'storage', 'network', 'player'];
+  window.__antMockPermissions = ['ui', 'storage', 'network', 'miniapp', 'player'];
 
   window.__antMockAppId = 'com.yourname.hello';
   window.__antMockTV = false;            // 想验证 TV 焦点逻辑时改 true
+  window.__antMockLaunchOptions = null;  // 模拟被其它小程序打开时可填启动参数
 
   // 采集源的假数据，字段结构照抄宿主返回的 vod_* 蛇形命名
   window.__antMockFixtures = {

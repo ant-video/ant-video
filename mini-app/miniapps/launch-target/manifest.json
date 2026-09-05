@@ -1,0 +1,14 @@
+{
+  "appId": "com.leospring.launch_target",
+  "name": "启动参数接收器",
+  "version": "1.0.0",
+  "versionCode": 1,
+  "renderer": "webview",
+  "entry": "index.html",
+  "description": "演示无需 miniapp 权限接收 onOpen 事件并读取启动参数",
+  "permissions": [
+    "ui",
+    "storage",
+    "navigate"
+  ]
+}

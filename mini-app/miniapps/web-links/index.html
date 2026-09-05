@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>网页跳转示例</title>
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    window.__antMockPermissions = ['ui', 'navigate'];
+    window.__antMockAppId = 'com.leospring.web_links';
+  </script>
+  <script src="ant-mock.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <span>导航安全示例</span>
+      <h1>站内走容器，站外走浏览器</h1>
+      <p>小程序不能把任意网站静默装进自己的 WebView。跨站链接由宿主展示完整地址并等待用户确认。</p>
+    </header>
+
+    <section class="grid">
+      <article>
+        <b>01</b>
+        <h2>容器内页面</h2>
+        <p>同一个小程序包内的相对路径，使用 <code>ant.navigateTo</code> 打开。</p>
+        <button data-action="local">打开本地第二页</button>
+      </article>
+      <article>
+        <b>02</b>
+        <h2>外部 HTTPS 网站</h2>
+        <p>真实链接使用 <code>target="_blank"</code>。真机上确认后交给系统浏览器。</p>
+        <a href="https://example.com/" target="_blank" rel="noopener">打开 example.com</a>
+      </article>
+      <article>
+        <b>03</b>
+        <h2>系统协议</h2>
+        <p>mailto、tel 等也必须由用户确认，再交给对应系统应用处理。</p>
+        <a href="mailto:hello@example.com" target="_blank" rel="noopener">写一封示例邮件</a>
+      </article>
+    </section>
+
+    <aside>
+      在线站点型小程序直接把 manifest 的 <code>entry</code> 写成 HTTPS 地址；示例见
+      <code>miniapps/online-site/manifest.json</code>。这类站点默认启用宿主广告过滤。
+    </aside>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "appId": "com.leospring.cctvvideo",
+  "name": "CCTV节目官网",
+  "versionCode": 1,
+  "description": "央视网节目官网手机版：直播、热播剧集、栏目与各频道节目单",
+  "entry": "https://tv.cctv.com/m/index.shtml",
+  "permissions": ["ui", "navigate"],
+  "network": {
+    "allowlist": [
+      "*.cctv.com",
+      "*.cctv.cn",
+      "*.cntv.cn",
+      "*.cntv.com"
+    ]
+  }
+}

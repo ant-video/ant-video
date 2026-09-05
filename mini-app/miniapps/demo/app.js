@@ -135,6 +135,33 @@ var actions = {
   navigate: function () {
     return ant.navigateTo('page2.html');
   },
+  'open-miniapp': function () {
+    if (!ant.miniApp) {
+      show('miniApp.open', '当前宿主 SDK 版本太低（需要 v3）');
+      return Promise.resolve();
+    }
+    return ant.miniApp
+      .open({
+        appId: 'com.leospring.launch_target',
+        path: 'detail.html?id=demo',
+        params: {
+          title: '来自示例小程序',
+          requestId: 'demo-' + Date.now().toString(36)
+        }
+      })
+      .then(function (result) {
+        show('miniApp.open', result);
+      });
+  },
+  'launch-options': function () {
+    if (!ant.miniApp) {
+      show('miniApp.getLaunchOptions', '当前宿主 SDK 版本太低（需要 v3）');
+      return Promise.resolve();
+    }
+    return ant.miniApp.getLaunchOptions().then(function (options) {
+      show('miniApp.getLaunchOptions', options || '本次是从小程序中心直接启动');
+    });
+  },
   exit: function () {
     return ant.exitMiniApp();
   }
@@ -158,6 +185,12 @@ ant.player.onStateChange(function (state) {
 ant.player.onClose(function () {
   show('player.close', '播放页已关闭');
 });
+
+if (ant.miniApp) {
+  ant.miniApp.onOpen(function (options) {
+    show('miniApp.onOpen', options);
+  });
+}
 
 /* TV：把遥控方向键映射成焦点移动，宿主会转发 keydown 事件。 */
 ant.tv.onKey(function (event) {

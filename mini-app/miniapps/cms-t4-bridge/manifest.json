@@ -1,0 +1,10 @@
+{
+  "appId": "com.leospring.cms_t4_bridge",
+  "name": "CMS 转 T4 服务",
+  "version": "1.2.0",
+  "versionCode": 6,
+  "renderer": "webview",
+  "entry": "index.html",
+  "description": "配置多个 CMS JSON 接口并转换为可供其它应用使用的 T4 兼容服务",
+  "permissions": ["ui", "storage", "network", "service"]
+}

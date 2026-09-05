@@ -12,6 +12,7 @@
 
   var seq = 0;
   var listeners = {};
+  var miniAppLaunchOptions = null;
 
   function bridgeReady() {
     return new Promise(function (resolve) {
@@ -82,6 +83,9 @@
   /** 宿主 → 小程序的事件入口，由 Dart 侧 evaluateJavascript 调用。 */
   window.__antEmit = function (payload) {
     if (!payload || !payload.event) return;
+    if (payload.event === 'miniApp.open') {
+      miniAppLaunchOptions = payload.data || null;
+    }
     var list = (listeners[payload.event] || []).slice();
     for (var i = 0; i < list.length; i++) {
       try {
@@ -287,6 +291,34 @@
     }
   };
 
+  /* ---------------- 小程序 ---------------- */
+
+  var miniApp = {
+    /**
+     * 经用户确认后打开另一个已安装小程序，需要 miniapp 权限。
+     * path 只能是目标小程序内的相对路径，params 必须是 JSON 对象。
+     */
+    open: function (options) {
+      var opts = typeof options === 'string' ? { appId: options } : options || {};
+      return invoke('miniApp.open', {
+        appId: opts.appId,
+        path: opts.path,
+        params: opts.params || {}
+      });
+    },
+    /** 最近一次由其它小程序打开时收到的来源、path 和 params。 */
+    getLaunchOptions: function () {
+      return invoke('miniApp.getLaunchOptions', {}).then(function (options) {
+        miniAppLaunchOptions = options || null;
+        return miniAppLaunchOptions;
+      });
+    },
+    /** 监听本页存活期间后续收到的跨小程序打开请求。 */
+    onOpen: function (handler) {
+      return on('miniApp.open', handler);
+    }
+  };
+
   /* ---------------- 播放器 ---------------- */
 
   var player = {
@@ -386,7 +418,7 @@
 
   window.ant = {
     /** SDK 协议版本，与宿主 env.getSystemInfo().sdkVersion 对应。 */
-    version: 2,
+    version: 3,
     invoke: invoke,
     on: on,
     off: off,
@@ -402,6 +434,7 @@
     serve: serve,
     storage: storage,
     ui: ui,
+    miniApp: miniApp,
     clipboard: clipboard,
     player: player,
     source: source,

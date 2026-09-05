@@ -1,0 +1,107 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f5f6f8;
+  --card: #ffffff;
+  --text: #1c1d21;
+  --muted: #6b6f76;
+  --accent: #3d6bfb;
+  --border: #e3e5ea;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14151a;
+    --card: #1d1f26;
+    --text: #f2f3f5;
+    --muted: #9aa0a8;
+    --border: #2c2f38;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* 容器的 WebView 背景是透明的，不设这条会看到宿主的背景图透上来。 */
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  /* 刘海屏与手势条区域要自己留出来 */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.bar {
+  padding: 16px 16px 8px;
+}
+
+.bar h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.muted {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+main {
+  padding: 8px 16px 24px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+button {
+  flex: 1 1 auto;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+button:active {
+  opacity: 0.85;
+}
+
+pre {
+  margin: 12px 0 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* TV 上焦点必须一眼能看到，遥控器没有指针。 */
+:focus-visible {
+  outline: 3px solid #ffb020;
+  outline-offset: 2px;
+}
+
+body.tv {
+  font-size: 18px;
+}
+
+body.tv button {
+  min-height: 56px;
+}

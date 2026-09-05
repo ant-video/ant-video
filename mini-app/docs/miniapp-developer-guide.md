@@ -2,7 +2,7 @@
 
 写给要给这个宿主做小程序的开发者。只需要会 HTML/JS/CSS，不需要碰 Flutter，也不需要重新编译宿主。
 
-配套文档：[脱离宿主开发调试](miniapp-standalone-dev.md) · [JSAPI 参考](../skills/miniapp-dev/references/jsapi.md)（技术设计文档在宿主仓库 `docs/miniapp/` 下）
+配套文档：[脱离宿主开发调试](miniapp-standalone-dev.md) · [技术设计](2026-09-01-miniapp-design.md)
 
 ---
 
@@ -129,6 +129,7 @@ Android 分区存储下拿到的路径常常读不了，那边还是用 zip。
 - **代码在别人服务器上，随时会变**。宿主在小程序图标右下角标一个云角标提示用户，权限声明请按最小集写。
 - 页面里的 `fetch` / `<img>` / `<script src>` 不算导航，不受 `allowlist` 约束，跨域由浏览器的 CORS 决定；需要绕 CORS 就走 `ant.request`。
 - 站点自己的 `localStorage` / Cookie 跟着站点 origin 走，不是宿主的 `ant.storage` 分区；要跨设备或跟宿主对齐，用 `ant.storage`。
+- 宿主默认对在线站点启用广告过滤：请求层拦截常见国内外广告平台及典型广告资源，页面层隐藏横幅、信息流、插屏和视频广告控件。这个能力只作用于在线站点型小程序，规则由宿主维护，小程序不能借此向第三方页面注入任意脚本；若站点被误伤，用户可在「小程序设置 → 在线网站广告过滤」关闭，结束该小程序后重新打开生效。
 
 ## 3. 权限
 
@@ -138,13 +139,14 @@ Android 分区存储下拿到的路径常常读不了，那边还是用 zip。
 | `storage` | `ant.storage.*` |
 | `network` | `ant.request`、`ant.requestJson`、`ant.requestBytes` |
 | `navigate` | `ant.navigateTo` / `redirectTo` / `navigateBack` / `exitMiniApp` |
+| `miniapp` | `ant.miniApp.open`（打开其它已安装小程序） |
 | `player` | `ant.player.*` |
 | `source` | `ant.source.*` |
 | `service` | `ant.serve`（见 4.10） |
 
 `ant.env.getSystemInfo()` 和 `ant.log()` 不需要任何权限。
 
-**声明了就能直接用**，运行期不会再弹确认框——用户在安装和详情页已经看得到完整的权限列表。
+大部分权限都是**声明了就能直接用**，运行期不再重复确认——用户在安装和详情页已经看得到完整的权限列表。`miniapp` 是例外：声明决定能否调用，真正打开另一个小程序时仍会逐次显示目标名称，由用户确认。
 
 没声明就调用会 reject 一个 `code === 'PERMISSION_DENIED'` 的 Error。
 
@@ -250,6 +252,31 @@ await ant.exitMiniApp();                      // 关掉整个小程序
 只能跳自身 origin 内的地址，以及 `network.allowlist` 里写了的域名（在线站点型小程序的登录域、页面 CDN）；其余会 reject `CROSS_ORIGIN`。要打开真正的外部网页，让用户点一个真实的 `<a href="https://…" target="_blank">`——容器会弹确认框后交给系统浏览器。
 
 物理返回键/手势返回会先走 WebView 的历史栈，没有历史了才退出容器，不用自己处理。
+
+打开另一个**已经安装**的小程序需要在 manifest 声明 `miniapp` 权限：
+
+```js
+const result = await ant.miniApp.open({
+  appId: 'com.foo.target',
+  path: 'pages/detail.html?id=7', // 可省略；相对目标入口，不能跨域或越出包目录
+  params: { id: 7, from: 'recommend' }
+});
+// { opened:true, appId, name, resumed, path? }
+// 用户取消时 resolved 为 { opened:false, ... }，不是异常。
+```
+
+宿主会先确认目标已安装，再显示「来源要打开目标」确认框；只有当前可见的前台小程序能发起。目标已在后台时复用原 WebView，`resumed` 为 `true`；带 `path` 时会换到指定页面，不带则保持原页面。`params` 必须是 JSON 对象且不超过 64KB。
+
+目标小程序读取参数不需要 `miniapp` 权限。启动时应尽早注册 `onOpen`；也可以在任意时刻主动读取宿主缓存的最近一次参数：
+
+```js
+ant.miniApp.onOpen(options => {
+  console.log(options.sourceAppId, options.path, options.params);
+});
+
+const options = await ant.miniApp.getLaunchOptions();
+// 从小程序中心直接启动时为 null
+```
 
 ### 4.6 播放器
 
@@ -471,7 +498,7 @@ try {
 
 | code | 含义 | 怎么改 |
 |---|---|---|
-| `PERMISSION_DENIED` | 权限没声明，或用户拒绝了 | 在 manifest 补 `permissions` |
+| `PERMISSION_DENIED` | 权限没声明 | 在 manifest 补 `permissions` |
 | `UNKNOWN_API` | API 名写错，或宿主版本太老 | 查拼写；用 `sdkVersion` 做能力判断 |
 | `INVALID_PARAMS` | 必填参数缺失或非法 | 看 message 里点名的参数 |
 | `INVALID_URL` | 不是 http/https，或地址不合法 | — |
@@ -482,6 +509,10 @@ try {
 | `QUOTA_EXCEEDED` | `ant.storage` 超 5MB | 清理旧数据 |
 | `INVALID_KEY` | storage key 为空或超 256 字符 | — |
 | `CROSS_ORIGIN` | 想跳到小程序之外的地址 | 把域名写进 `network.allowlist`，或用 `<a target="_blank">` 让用户确认后走浏览器 |
+| `APP_NOT_INSTALLED` | `miniApp.open` 的目标尚未安装 | 引导用户先从小程序中心安装 |
+| `SAME_APP` | 用 `miniApp.open` 打开自己 | 改用 `navigateTo` |
+| `NOT_FOREGROUND` | 后台或被其它页面遮住时尝试打开小程序 | 回到前台后由用户操作触发 |
+| `BUSY` | 上一个跨小程序确认框仍未处理 | 等待前一次调用结束 |
 | `UNAVAILABLE` | 宿主对应模块未就绪（如没有播放模块） | 降级处理 |
 | `SITE_NOT_FOUND` / `SITE_UNAVAILABLE` | siteKey 不存在 / 该站点没有可用接口 | 先 `source.list()` 拿到真实 key |
 | `TOO_MANY_REQUESTS` | 采集源并发超过 3 | 串行化你的请求 |
@@ -517,4 +548,3 @@ try {
 - **`viewport-fit=cover` + `env(safe-area-inset-*)`**，刘海屏和手势条区域要留出来。
 - **深色模式**：宿主可以是深色主题，用 `prefers-color-scheme` 跟随，别硬写白底黑字。
 - **移动端点击**：直接用 `click` 事件即可，不需要 fastclick 之类的老方案。
-

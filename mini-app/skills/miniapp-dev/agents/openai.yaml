@@ -1,0 +1,4 @@
+interface:
+  display_name: "蚂蚁影视小程序开发"
+  short_description: "创建、调试、校验并打包蚂蚁影视 HTML/JS 小程序"
+  default_prompt: "使用 $miniapp-dev 创建并验证一个可在蚂蚁影视宿主运行的小程序。"

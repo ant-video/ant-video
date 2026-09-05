@@ -1,6 +1,6 @@
 # 蚂蚁影视 · 小程序
 
-[蚂蚁影视](../README.md)宿主的小程序生态目录：开发文档、示例小程序、注入 SDK、市场分发清单，以及一套给 Claude Code 用的开发 skill。
+[蚂蚁影视](../README.md)宿主的小程序生态目录：开发文档、示例小程序、注入 SDK、市场分发清单，以及一套可供 Codex / Claude Code 使用的开发 skill。
 
 小程序是纯 HTML/JS/CSS 包，跑在宿主容器的 WebView 里，通过宿主在 document-start 注入的
 `window.ant` 调用宿主能力（播放器、采集源、存储、UI）。**写小程序不需要碰 Flutter，也不需要重新编译宿主。**
@@ -13,8 +13,13 @@ mini-app/
 │  ├─ miniapp-developer-guide.md   开发引导：manifest、权限、JSAPI、打包发版
 │  └─ miniapp-standalone-dev.md    脱离宿主开发调试：三阶段流程 + mock SDK 全文
 ├─ miniapps/
-│  ├─ ant-sdk.js                   宿主注入的真 SDK（协议 v2，行为有疑问时以它为准）
+│  ├─ ant-sdk.js                   宿主注入的真 SDK（协议 v3，行为有疑问时以它为准）
 │  ├─ demo/                        覆盖全部 JSAPI 的最小示例
+│  ├─ app-launcher/                跨小程序打开的发起端
+│  ├─ launch-target/               启动参数与 onOpen 的接收端
+│  ├─ web-links/                   容器内导航与外部网站跳转
+│  ├─ online-site/                 manifest-only 在线站点示例
+│  ├─ cms-t4-bridge/               CMS JSON → T4 兼容反向服务
 │  ├─ tetris/                      俄罗斯方块（纯前端游戏 + TV 遥控）
 │  └─ emby/                        影视库（多页面 + 采集源 + 播放 + 续播）
 ├─ market/
@@ -27,11 +32,16 @@ mini-app/
 
 | 小程序 | appId | 权限 | 看点 |
 |---|---|---|---|
-| **示例小程序** `miniapps/demo/` | `com.leospring.demo` | ui / storage / network / navigate / player / source | 一屏按钮逐个试 `ant.*`（含二进制响应），动手前先跑它 |
+| **示例小程序** `miniapps/demo/` | `com.leospring.demo` | ui / storage / network / navigate / miniapp / player / source | 一屏按钮逐个试 SDK v3 常用 `ant.*`（含二进制响应与跨小程序打开） |
+| **小程序启动台** `miniapps/app-launcher/` | `com.leospring.launcher` | ui / miniapp | 发起 `miniApp.open`，演示用户取消、未安装错误、指定 path 与 JSON params |
+| **启动参数接收器** `miniapps/launch-target/` | `com.leospring.launch_target` | ui / storage / navigate | 接收 `onOpen`、读取 `getLaunchOptions`，支持保活复用与详情页落地 |
+| **网页跳转示例** `miniapps/web-links/` | `com.leospring.web_links` | ui / navigate | 对比同源容器导航、外部 HTTPS 网站和系统协议的确认流程 |
+| **在线站点示例** `miniapps/online-site/` | `com.leospring.online_site` | — | 只有 manifest，直接包装 HTTPS 站点并使用宿主广告过滤 |
+| **CMS 转 T4 服务** `miniapps/cms-t4-bridge/` | `com.leospring.cms_t4_bridge` | ui / storage / network / service | 配置多个 CMS JSON 接口，按 `site` 提供 `miniapp://` T4 首页、分类、搜索、详情和配置接口 |
 | **俄罗斯方块** `miniapps/tetris/` | `com.leospring.tetris` | ui / storage / navigate | 掌机复刻，Web Audio 音效 + LCD 光影；自带 `ant-mock.js`，浏览器里直接能玩 |
 | **影视库** `miniapps/emby/` | `com.leospring.emby` | ui / storage / navigate / player / source | Emby 风格四页面（首页 / 媒体库 / 搜索 / 详情），复用宿主已配置的采集源，续播记录存 `ant.storage` |
 
-三个都以 `com.leospring.*` 命名，与宿主内置的 `com.ant.*` 分开 —— appId 是唯一键，撞了会被当成同一个小程序。
+示例都以 `com.leospring.*` 命名，与宿主内置的 `com.ant.*` 分开 —— appId 是唯一键，撞了会被当成同一个小程序。体验跨小程序链路时先安装“启动参数接收器”，再打开“小程序启动台”。
 
 市场清单里还有一个 **LogVar 弹幕服务**（`com.logvar.danmu`），它演示的是**服务型小程序**：
 整个弹幕聚合服务跑在小程序里，播放器直接从它取弹幕，不用再自己部署 vercel / docker。
@@ -40,6 +50,22 @@ mini-app/
 
 `demo` 里没有 `ant.serve` 的按钮 —— 声明 `service` 权限会让小程序被宿主后台拉起，
 对一个纯演示包不合适。要看活例子就装弹幕服务。
+
+### CMS 转 T4 服务
+
+安装 `cms-t4-bridge` 后，在小程序页面添加多个 CMS JSON 接口，为每个接口设置唯一 `key`、显示名称和地址。
+它会注册一个后台服务，应用侧使用带站点参数的 T4 地址：
+
+- `/?site=站点key&filter=true`：CMS 首页转 T4 首页与分类
+- `/?site=站点key&t=分类ID&ac=videolist&pg=1`：分类分页，T4 的 `ext` 会转成 CMS 查询参数
+- `/?site=站点key&wd=关键词&pg=1`：搜索
+- `/?site=站点key&ac=detail&ids=影片ID`：详情
+- `/?site=站点key&flag=线路&play=播放地址`：将 CMS 选集中的直链转换为 T4 播放响应
+- `/config` 或 `/api/config`：严格返回 `{ "sites": [{ "key", "name", "type": 4, "api" }] }`
+
+当只有一个站点，`site` 可以省略；多个站点省略时使用小程序中设置的默认站点。
+
+服务必须保持在宿主中安装且未被用户结束；需要给其它设备使用时，可在宿主的小程序详情里打开局域网共享。
 
 ## 五分钟上手
 
@@ -109,7 +135,8 @@ python3 skills/miniapp-dev/scripts/pack_miniapp.py  miniapps/hello
 ## JSAPI 速查
 
 全部返回 Promise，失败 reject 一个带 `code` / `api` 的 Error。方括号是所需权限，
-**manifest 里没声明的能力一律 `PERMISSION_DENIED`**；声明了运行期就直接可用，不会再弹确认框。
+**manifest 里没声明的能力一律 `PERMISSION_DENIED`**。大多数权限声明后直接可用；
+`miniapp` 会把用户带到另一个应用，所以每次打开仍会展示目标名称让用户确认。
 
 ```js
 ant.env.getSystemInfo()   // {platform,osVersion,isTV,appId,devMode,permissions,sdkVersion}  免权限
@@ -122,6 +149,8 @@ ant.storage.get/set/getJSON/setJSON/remove/clear/keys()                         
 ant.ui.toast/loading/hideLoading/confirm({title,content})/actionSheet([...])             [ui]
 ant.clipboard.get/set(text)                                                             [ui]
 ant.navigateTo/redirectTo(url) · navigateBack() · exitMiniApp()                         [navigate]
+ant.miniApp.open({appId,path?,params?})                                                  [miniapp]
+ant.miniApp.getLaunchOptions() · onOpen(fn)                                             [免权限]
 ant.player.open({url,title,headers}) · getState() · onStateChange(fn) · onClose(fn)      [player]
 ant.source.list() · home(siteKey) · category({siteKey,tid,page,ext})
          · detail({siteKey,id}) · play({siteKey,flag,id}) · search({siteKey,wd,page})    [source]
@@ -129,7 +158,7 @@ ant.serve(async req => resp)                    // 宿主反过来调你，见�
 ant.on/off/once(event, fn) · onShow(fn) · onHide(fn) · tv.onKey(fn)
 ```
 
-事件：`app.show`、`app.hide`、`player.open`、`player.stateChange`、`player.close`、`keydown`。
+事件：`app.show`、`app.hide`、`miniApp.open`、`player.open`、`player.stateChange`、`player.close`、`keydown`。
 
 `ant.request` 走宿主的 HTTP 客户端，**不受浏览器 CORS 限制** —— 这是相对纯 H5 的最大优势。
 要拿原始字节就用 `responseType: 'base64'`（或 `ant.requestBytes`）：protobuf、gzip/brotli、
@@ -243,17 +272,22 @@ zip 传到任何能直链下载的地方，再提供一个 JSON 清单地址，�
 `manifest.entry` 写成 `https://…` 时，包里只要一份 `manifest.json`：宿主不起本地静态服务，
 WebView 直接开这个地址，SDK 照旧注入。装法是「+ → 从链接安装」填 manifest 的地址，
 市场清单的 `url` 也可以直接指向 `manifest.json`。要点：站内会跳到的域名（登录回跳、`www` 与裸域、
-页面 CDN）**都得逐条写进 `network.allowlist`**，入口不能指向本机或内网。详见开发引导第 2.5 节。
+页面 CDN）**都得逐条写进 `network.allowlist`**，入口不能指向本机或内网。
 
-## Claude Code Skill
+宿主默认对在线站点启用两层广告过滤：请求层拦截常见国内外广告厂商及典型广告资源，页面层
+隐藏横幅、信息流、插屏和视频广告控件。若页面被误伤，可在「小程序设置 → 在线网站广告过滤」
+关闭，结束实例后重新打开生效。详见开发引导第 2.5 节。
+
+## Codex / Claude Code Skill
 
 `skills/miniapp-dev/` 是一份自带资料的 skill，唯一外部依赖是 `python3`（标准库即可，不需要
-zip/md5 命令，也不需要 Flutter、Node、宿主源码）。拷到 `~/.claude/skills/` 或某个项目的
-`.claude/skills/` 下就能用，触发词是「小程序 / miniapp」以及各类 JSAPI 名与错误码。
+zip/md5 命令，也不需要 Flutter、Node、宿主源码）。可装进 Codex skills，或拷到
+`~/.claude/skills/` / 项目的 `.claude/skills/`。触发词覆盖「小程序 / miniapp」、JSAPI 名和错误码。
 
 ```
 skills/miniapp-dev/
 ├─ SKILL.md                    工作流：脚手架 → 浏览器 → 调试模式 → 预检打包
+├─ agents/openai.yaml          Codex 列表展示与默认提示
 ├─ references/jsapi.md         完整 JSAPI 参考：manifest 全字段、权限、签名与返回结构、
 │                              事件表、错误码表、硬限制、完整看片链路示例
 ├─ assets/ant-mock.js          浏览器 mock SDK（检测到真 SDK 自动退让，打包时留着无害）
@@ -278,4 +312,3 @@ skills/miniapp-dev/
 | [JSAPI 参考](skills/miniapp-dev/references/jsapi.md) | 只想要一份速查表，或不在宿主仓库里 |
 
 关注频道：[Ant Video](https://t.me/ant_video)
-

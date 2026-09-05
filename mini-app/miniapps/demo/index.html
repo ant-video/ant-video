@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>示例小程序</title>
   <link rel="stylesheet" href="style.css" />
+  <script>
+    window.__antMockPermissions = ['network', 'storage', 'ui', 'navigate', 'miniapp', 'player', 'source'];
+    window.__antMockAppId = 'com.leospring.demo';
+  </script>
+  <script src="ant-mock.js"></script>
 </head>
 <body>
   <header>
@@ -47,6 +52,8 @@
     <h2>导航</h2>
     <div class="grid">
       <button data-action="navigate">打开第二页</button>
+      <button data-action="open-miniapp">打开“启动参数接收器”</button>
+      <button data-action="launch-options">读取本次启动参数</button>
       <button data-action="exit">退出小程序</button>
     </div>
   </section>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>接收器详情页</title>
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    window.__antMockPermissions = ['ui', 'storage', 'navigate'];
+    window.__antMockAppId = 'com.leospring.launch_target';
+    window.__antMockLaunchOptions = {
+      sourceAppId: 'com.browser.mock',
+      sourceAppName: '浏览器模拟器',
+      path: 'detail.html?id=42',
+      params: { title: '详情页模拟参数', requestId: 'mock-detail' }
+    };
+  </script>
+  <script src="ant-mock.js"></script>
+</head>
+<body data-page="detail">
+  <main>
+    <header>
+      <span class="badge">指定 path 落地</span>
+      <h1>详情页 <em id="detail-id"></em></h1>
+      <p>这个文档由 <code>miniApp.open({ path })</code> 直接加载，令牌与入口 origin 由宿主保护。</p>
+    </header>
+
+    <section class="card current">
+      <div class="title-row">
+        <h2>收到的参数</h2>
+        <span id="source">直接启动</span>
+      </div>
+      <pre id="output">正在调用 getLaunchOptions…</pre>
+    </section>
+
+    <section class="card">
+      <h2>页面动作</h2>
+      <div class="actions">
+        <button data-action="back">返回上一页</button>
+        <button data-action="home">回到接收器首页</button>
+        <button class="secondary" data-action="history">查看接收历史</button>
+      </div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

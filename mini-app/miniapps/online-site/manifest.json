@@ -1,0 +1,10 @@
+{
+  "appId": "com.leospring.online_site",
+  "name": "在线站点示例",
+  "version": "1.0.0",
+  "versionCode": 1,
+  "renderer": "webview",
+  "entry": "https://example.com/",
+  "description": "最小的在线站点型小程序清单；替换 entry 和 allowlist 即可包装自己的 HTTPS 站点",
+  "permissions": []
+}
