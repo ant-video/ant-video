@@ -3,6 +3,9 @@
 
   var APP_ID = 'com.leospring.cms_t4_bridge';
   var STORAGE_KEY = 'cms-t4-config';
+  var LAN_KEY = 'cms-t4-lan';
+  var INTERNAL_BASE = 'miniapp://' + APP_ID;
+
   var keyInput = document.getElementById('key');
   var nameInput = document.getElementById('name');
   var urlInput = document.getElementById('url');
@@ -10,8 +13,20 @@
   var siteEditorTitle = document.getElementById('site-editor-title');
   var status = document.getElementById('status');
   var output = document.getElementById('config-output');
+  var configUrl = document.getElementById('config-url');
+  var linkList = document.getElementById('link-list');
+  var lanForm = document.getElementById('lan-form');
+  var lanInput = document.getElementById('lan-base');
+  var scopeHint = document.getElementById('scope-hint');
+  var exportStatus = document.getElementById('export-status');
+  var prefixSample = document.getElementById('prefix-sample');
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab'));
+
   var current = { sites: [], selectedKey: '' };
+  var lan = { base: '', detected: '', detectedAt: 0 };
   var editingKey = '';
+  var scope = 'internal';
+  var activeConfigUrl = '';
 
   function jsonResponse(value, statusCode) {
     return {
@@ -28,6 +43,20 @@
   function setStatus(message, kind) {
     status.textContent = message;
     status.className = 'status' + (kind ? ' ' + kind : '');
+  }
+
+  function setExportStatus(message, kind) {
+    exportStatus.textContent = message || '';
+    exportStatus.className = 'status' + (kind ? ' ' + kind : '');
+  }
+
+  function copyText(text, label) {
+    if (!text) { setExportStatus('没有可复制的内容。', 'error'); return; }
+    ant.clipboard.set(text).then(function () {
+      setExportStatus(label + '已复制。', 'ok');
+    }).catch(function (e) {
+      setExportStatus('复制失败：' + ((e && e.message) || e), 'error');
+    });
   }
 
   function cleanKey(raw) {
@@ -48,6 +77,40 @@
     }
     parsed.hash = '';
     return parsed.toString();
+  }
+
+  // 局域网入口必须是私有网段：回环地址只有本机能用，宿主也只放行私有来源。
+  function isLanHost(hostname) {
+    var host = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '');
+    if (!host || host === 'localhost' || host === '::1' || /^127\./.test(host)) return false;
+    if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
+    if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
+    if (/^172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
+    if (/^169\.254\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
+    return /\.local$/.test(host);
+  }
+
+  // 宿主给的地址形如 http://192.168.1.7:9321/<lanToken>；
+  // 允许用户把带 /config、/health、/site/xxx 或带查询串的整段地址直接粘进来。
+  function cleanLanBase(raw) {
+    var value = String(raw || '').trim();
+    if (!value) throw new Error('请填写局域网共享地址');
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) value = 'http://' + value;
+    var parsed;
+    try { parsed = new URL(value); } catch (e) { throw new Error('地址不是合法 URL'); }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error('局域网地址只支持 http 或 https');
+    }
+    var path = String(parsed.pathname || '').replace(/\/+$/, '');
+    path = path.replace(/\/(?:api\/(?:v1\/)?)?(?:config|health)$/i, '');
+    path = path.replace(/\/(?:site|s)\/[^/]+$/i, '');
+    path = path.replace(/\/__service$/, '');
+    return parsed.protocol + '//' + parsed.host + path.replace(/\/+$/, '');
+  }
+
+  function safeLanBase(raw) {
+    if (!raw) return '';
+    try { return cleanLanBase(raw); } catch (e) { return ''; }
   }
 
   function normalizeConfig(value) {
@@ -81,23 +144,119 @@
   function saveConfig(config, message) {
     current = normalizeConfig(config);
     return ant.storage.setJSON(STORAGE_KEY, config).then(function () {
-      paintConfig();
+      paint();
       setStatus(message || '配置已保存，T4 服务已启用。', 'ok');
     });
   }
 
-  function configDescriptor() {
-    return { sites: current.sites.map(function (site) {
-      return {
-        key: site.key,
-        name: site.name,
-        type: 4,
-        api: 'miniapp://' + APP_ID + '?site=' + encodeURIComponent(site.key)
-      };
-    }) };
+  function normalizeLan(value) {
+    value = value || {};
+    return {
+      base: safeLanBase(value.base),
+      detected: safeLanBase(value.detected),
+      detectedAt: Number(value.detectedAt) || 0
+    };
   }
 
-  function paintConfig() {
+  function readLan() {
+    return ant.storage.getJSON(LAN_KEY, null).then(normalizeLan);
+  }
+
+  function writeLan(next) {
+    lan = normalizeLan(next);
+    return ant.storage.setJSON(LAN_KEY, { base: lan.base, detected: lan.detected, detectedAt: lan.detectedAt });
+  }
+
+  // 宿主没有读取局域网地址的 JSAPI，但局域网请求打进来时 req.url 是完整入口，
+  // 而 req.path 已经剥掉了前缀；两者相减就是 http://IP:9321/<lanToken>。
+  function lanBaseFromRequest(req) {
+    var headers = (req && req.headers) || {};
+    var forwarded = headers['X-Ant-Lan-Base'] || headers['x-ant-lan-base'];
+    if (forwarded) {
+      var forwardedBase = safeLanBase(forwarded);
+      if (forwardedBase) return forwardedBase;
+    }
+    var raw = req && req.url;
+    if (!raw) return '';
+    var parsed;
+    try { parsed = new URL(String(raw)); } catch (e) { return ''; }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+    if (!isLanHost(parsed.hostname)) return '';
+    var full = String(parsed.pathname || '/');
+    var path = String((req && req.path) || '/');
+    var prefix = full;
+    if (path !== '/' && full.length >= path.length && full.slice(full.length - path.length) === path) {
+      prefix = full.slice(0, full.length - path.length);
+    }
+    prefix = prefix.replace(/\/+$/, '').replace(/\/__service$/, '');
+    return prefix ? parsed.protocol + '//' + parsed.host + prefix : '';
+  }
+
+  function requestFromLan(req) {
+    if (lanBaseFromRequest(req)) return true;
+    var headers = (req && req.headers) || {};
+    var host = headers.host || headers.Host || headers['x-forwarded-host'] || headers['X-Forwarded-Host'];
+    return !!host && isLanHost(String(host).replace(/:\d+$/, ''));
+  }
+
+  // 后台拉起时内存里的 lan 可能还没读出来，所以读一遍存储再写，别覆盖手填的地址。
+  function rememberLanBase(req) {
+    var found = lanBaseFromRequest(req);
+    if (!found) return;
+    readLan().then(function (value) {
+      if (value.detected === found) { lan = value; return null; }
+      return writeLan({ base: value.base, detected: found, detectedAt: Date.now() }).then(function () {
+        if (linkList) paintExport();
+      });
+    }).catch(function () {});
+  }
+
+  function effectiveLanBase() { return lan.base || lan.detected || ''; }
+
+  function isInternalBase(base) { return String(base).indexOf('miniapp://') === 0; }
+
+  // miniapp:// 后面直接跟查询串，http 地址要保留目录斜杠。
+  function joinPath(base, path) {
+    if (path === '/') return isInternalBase(base) ? base : base + '/';
+    return base + path;
+  }
+
+  // 站点走路径而不是查询串：T4 调用方会往 api 后面直接接 `?ac=…`，
+  // 给出 `?site=` 形式的地址会拼成两个问号。查询串形式仍然照旧受理。
+  function siteApi(base, key) {
+    return joinPath(base, '/site/' + encodeURIComponent(key));
+  }
+
+  function descriptor(sites, base) {
+    return {
+      sites: sites.map(function (site) {
+        return {
+          key: site.key,
+          name: site.name,
+          type: 4,
+          api: siteApi(base, site.key),
+          searchable: 1,
+          quickSearch: 1,
+          filterable: 1
+        };
+      })
+    };
+  }
+
+  function resolveApiBase(req, lanRecord) {
+    var params = (req && req.params) || {};
+    var raw = String(params.base || params.apiBase || '').trim();
+    if (/^miniapp:\/\//i.test(raw)) return raw.replace(/\/+$/, '');
+    var explicit = safeLanBase(raw);
+    if (explicit) return explicit;
+    var detected = lanBaseFromRequest(req);
+    if (detected) return detected;
+    var stored = (lanRecord && (lanRecord.base || lanRecord.detected)) || '';
+    if (stored && requestFromLan(req)) return stored;
+    return INTERNAL_BASE;
+  }
+
+  function paintSites() {
     var editing = current.sites.find(function (site) { return site.key === editingKey; });
     if (editing) {
       keyInput.value = editing.key;
@@ -119,7 +278,7 @@
       item.querySelector('strong').textContent = site.name;
       item.querySelector('span').textContent = 'key: ' + site.key + (site.key === current.selectedKey ? ' · 当前默认' : '');
       item.querySelector('code').textContent = site.url;
-      item.querySelector('[data-key="edit"]').addEventListener('click', function () { editingKey = site.key; paintConfig(); });
+      item.querySelector('[data-key="edit"]').addEventListener('click', function () { editingKey = site.key; paintSites(); });
       item.querySelector('[data-key="default"]').addEventListener('click', function () {
         current.selectedKey = site.key;
         saveConfig(current, '已设为默认站点。');
@@ -132,18 +291,103 @@
       });
       siteList.appendChild(item);
     });
-    output.textContent = JSON.stringify(configDescriptor(), null, 2);
   }
 
+  function linkRow(row) {
+    var item = document.createElement('div');
+    item.className = 'link-item';
+    var meta = document.createElement('div');
+    meta.className = 'link-meta';
+    var label = document.createElement('strong');
+    label.textContent = row.label;
+    meta.appendChild(label);
+    if (row.hint) {
+      var hint = document.createElement('span');
+      hint.textContent = row.hint;
+      meta.appendChild(hint);
+    }
+    var code = document.createElement('code');
+    code.textContent = row.url;
+    meta.appendChild(code);
+    var button = document.createElement('button');
+    button.className = 'copy';
+    button.textContent = '复制';
+    button.setAttribute('data-focus', '');
+    button.addEventListener('click', function () { copyText(row.url, row.label + '地址'); });
+    item.appendChild(meta);
+    item.appendChild(button);
+    return item;
+  }
+
+  function paintExport() {
+    var isLan = scope === 'lan';
+    tabs.forEach(function (tab) {
+      var active = tab.getAttribute('data-scope') === scope;
+      tab.className = 'tab' + (active ? ' is-active' : '');
+    });
+    lanForm.hidden = !isLan;
+    linkList.innerHTML = '';
+
+    var base = isLan ? effectiveLanBase() : INTERNAL_BASE;
+    if (!base) {
+      activeConfigUrl = '';
+      configUrl.textContent = '未设置局域网地址';
+      prefixSample.textContent = 'http://192.168.1.7:9321/lanToken';
+      scopeHint.textContent = '在宿主里开启局域网共享，把地址填到下面即可；别的设备访问过一次后页面也会自己认出来。';
+      output.textContent = '设置局域网地址后，这里给出可直接导入第三方播放器的配置 JSON。';
+      return;
+    }
+
+    activeConfigUrl = joinPath(base, '/config');
+    configUrl.textContent = activeConfigUrl;
+    prefixSample.textContent = base;
+    scopeHint.textContent = isLan
+      ? (lan.base ? '手动填写的地址' : '自动识别的地址（来自最近一次局域网请求）') + '，同一网络里的设备和第三方播放器可直接用；token 泄露等于把服务交出去。'
+      : '宿主内部地址，供宿主自己的设置项和其它小程序引用；出了这台设备用不了，给别的设备请切到局域网。';
+
+    if (!current.sites.length) {
+      var empty = document.createElement('p');
+      empty.className = 'hint';
+      empty.textContent = '还没有站点，先在上面添加一个 CMS 接口；此时 config 接口返回空的 sites。';
+      linkList.appendChild(empty);
+    } else {
+      linkList.appendChild(linkRow({
+        label: '默认站点',
+        hint: '省略 site 参数，走小程序里设为默认的站点',
+        url: joinPath(base, '/')
+      }));
+      current.sites.forEach(function (site) {
+        linkList.appendChild(linkRow({
+          label: site.name,
+          hint: 'key: ' + site.key + (site.key === current.selectedKey ? ' · 默认' : '') + ' · 后面可直接接 ?ac=…',
+          url: siteApi(base, site.key)
+        }));
+      });
+    }
+    linkList.appendChild(linkRow({
+      label: '健康检查',
+      hint: '确认服务在线与站点数量',
+      url: joinPath(base, '/health')
+    }));
+    output.textContent = JSON.stringify(descriptor(current.sites, base), null, 2);
+  }
+
+  function paint() {
+    paintSites();
+    paintExport();
+  }
+
+  // site 既可以走查询串，也可以走 /site/<key> 路径——有些调用方会吞掉查询串。
   function siteKeyFromRequest(req) {
-    return String(req && req.params && req.params.site || '').trim();
+    var fromParams = String((req && req.params && req.params.site) || '').trim();
+    if (fromParams) return fromParams;
+    var matched = String((req && req.path) || '').match(/^\/(?:site|s)\/([^/?#]+)/);
+    return matched ? decodeURIComponent(matched[1]) : '';
   }
 
-  function serviceApiBase(req) {
-    var headers = req && req.headers || {};
-    var lanBase = headers['X-Ant-Lan-Base'] || headers['x-ant-lan-base'];
-    if (lanBase) return String(lanBase).replace(/\/$/, '');
-    return 'miniapp://' + APP_ID;
+  function businessPath(req) {
+    var path = String((req && req.path) || '/').replace(/^\/(?:site|s)\/[^/?#]+/, '');
+    return path || '/';
   }
 
   function selectSite(config, req) {
@@ -295,16 +539,20 @@
   }
 
   function handleService(req) {
-    return readConfig().then(function (config) {
-      var path = req.path || '/';
+    rememberLanBase(req);
+    return Promise.all([readConfig(), readLan()]).then(function (loaded) {
+      var config = loaded[0];
+      var path = businessPath(req);
       if (path === '/health' || path === '/api/health') {
-        return jsonResponse({ code: 0, msg: 'ok', data: { appId: APP_ID, configured: config.sites.length > 0, sites: config.sites.length } });
+        return jsonResponse({ code: 0, msg: 'ok', data: {
+          appId: APP_ID,
+          configured: config.sites.length > 0,
+          sites: config.sites.length,
+          siteKeys: config.sites.map(function (site) { return site.key; })
+        } });
       }
       if (path === '/config' || path === '/api/config' || path === '/api/v1/config') {
-        var apiBase = serviceApiBase(req);
-        return jsonResponse({ sites: config.sites.map(function (site) {
-          return { key: site.key, name: site.name, type: 4, api: apiBase + '?site=' + encodeURIComponent(site.key) };
-        }) });
+        return jsonResponse(descriptor(config.sites, resolveApiBase(req, loaded[1])));
       }
       if (!config.sites.length) return errorResponse('NOT_CONFIGURED', '请先在小程序内配置 CMS 接口', 503);
       var site = selectSite(config, req);
@@ -384,14 +632,54 @@
       editingKey = '';
       nameInput.value = '';
       urlInput.value = '';
-      paintConfig();
-      setStatus('配置已清除，服务暂不可用。');
+      paint();
+      setStatus('站点配置已清除，服务暂不可用（局域网地址保留）。');
     }).catch(function (e) { setStatus('清除失败：' + e.message, 'error'); });
   });
 
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      scope = tab.getAttribute('data-scope') === 'lan' ? 'lan' : 'internal';
+      setExportStatus('');
+      paintExport();
+    });
+  });
+
+  document.getElementById('copy-config-url').addEventListener('click', function () {
+    copyText(activeConfigUrl, 'config 接口');
+  });
+
   document.getElementById('copy').addEventListener('click', function () {
-    if (!current.sites.length) { setStatus('请先保存配置。', 'error'); return; }
-    ant.clipboard.set(output.textContent).then(function () { setStatus('配置 JSON 已复制。', 'ok'); });
+    if (!current.sites.length) { setExportStatus('请先添加站点。', 'error'); return; }
+    if (scope === 'lan' && !effectiveLanBase()) { setExportStatus('请先设置局域网地址。', 'error'); return; }
+    copyText(output.textContent, '配置 JSON');
+  });
+
+  document.getElementById('lan-save').addEventListener('click', function () {
+    var base;
+    try { base = cleanLanBase(lanInput.value); }
+    catch (e) { setExportStatus(e.message, 'error'); return; }
+    var parsed = new URL(base);
+    writeLan({ base: base, detected: lan.detected, detectedAt: lan.detectedAt }).then(function () {
+      lanInput.value = base;
+      scope = 'lan';
+      paintExport();
+      if (!isLanHost(parsed.hostname)) {
+        setExportStatus('已保存，但这不像局域网地址，别的设备可能连不上。', 'error');
+      } else if (!String(parsed.pathname || '').replace(/\/+$/, '')) {
+        setExportStatus('已保存，但地址里缺少 token 段，请从宿主整段复制。', 'error');
+      } else {
+        setExportStatus('局域网地址已保存。', 'ok');
+      }
+    }).catch(function (e) { setExportStatus('保存失败：' + ((e && e.message) || e), 'error'); });
+  });
+
+  document.getElementById('lan-clear').addEventListener('click', function () {
+    writeLan({ base: '', detected: lan.detected, detectedAt: lan.detectedAt }).then(function () {
+      lanInput.value = '';
+      paintExport();
+      setExportStatus(lan.detected ? '已清除手填地址，改用自动识别的地址。' : '已清除局域网地址。');
+    }).catch(function (e) { setExportStatus('清除失败：' + ((e && e.message) || e), 'error'); });
   });
 
   ant.tv.onKey(function (event) {
@@ -403,11 +691,24 @@
     else if (event.key === 'Enter' || event.key === 'Select') { if (document.activeElement) document.activeElement.click(); return; }
     else return;
     items[index].focus();
+    if (items[index].scrollIntoView) items[index].scrollIntoView({ block: 'nearest' });
   });
 
-  readConfig().then(function (config) {
-    current = normalizeConfig(config);
-    paintConfig();
+  // 回到前台时重读一次：局域网地址可能是后台请求进来时才认出来的。
+  ant.onShow(function () {
+    readLan().then(function (value) {
+      lan = value;
+      if (!lanInput.value) lanInput.value = lan.base;
+      paintExport();
+    }).catch(function () {});
+  });
+
+  Promise.all([readConfig(), readLan()]).then(function (loaded) {
+    current = loaded[0];
+    lan = loaded[1];
+    lanInput.value = lan.base;
+    paint();
     if (current.sites.length) setStatus('已加载 ' + current.sites.length + ' 个 CMS 站点，T4 服务运行中。', 'ok');
-  }).catch(function (e) { setStatus('读取配置失败：' + e.message, 'error'); });
+    else setStatus('添加站点后，下面的 config 接口就能给其它应用用了。');
+  }).catch(function (e) { setStatus('读取配置失败：' + ((e && e.message) || e), 'error'); });
 })();

@@ -38,27 +38,61 @@
         <button data-focus id="test">测试接口</button>
         <button data-focus class="quiet" id="reset">清除配置</button>
       </div>
-      <p id="status" class="status">服务启动后会自动注册，无需保持页面在前台。添加站点后可在其它应用中使用带 site 参数的 miniapp:// 地址。</p>
+      <p id="status" class="status">服务启动后会自动注册，无需保持页面在前台。</p>
       <div id="site-list" class="site-list"></div>
     </section>
 
-    <section class="panel output-panel">
+    <section class="panel export">
       <div class="panel-head">
-        <h2>对外配置</h2>
+        <h2>对外接口</h2>
+        <div class="tabs">
+          <button data-focus class="tab is-active" data-scope="internal">宿主内部</button>
+          <button data-focus class="tab" data-scope="lan">局域网</button>
+        </div>
+      </div>
+
+      <div class="hero-link">
+        <div class="hero-link-text">
+          <span>config 配置接口</span>
+          <code id="config-url">尚未配置</code>
+        </div>
+        <button data-focus class="primary" id="copy-config-url">复制</button>
+      </div>
+      <p id="scope-hint" class="hint"></p>
+
+      <div id="lan-form" class="lan-form" hidden>
+        <label>
+          <span>局域网共享地址</span>
+          <input id="lan-base" type="url" inputmode="url" placeholder="http://192.168.1.7:9321/lanToken" autocomplete="off" />
+        </label>
+        <div class="actions">
+          <button data-focus class="primary" id="lan-save">保存地址</button>
+          <button data-focus class="quiet" id="lan-clear">清除</button>
+        </div>
+        <p class="hint">宿主里打开「小程序设置 → 局域网共享」（或本小程序详情页）会显示 <code>http://IP:9321/…</code>，整段粘到这里即可。地址里的 token 就是唯一凭证，别在公共网络外传。</p>
+      </div>
+
+      <div id="link-list" class="link-list"></div>
+      <p id="export-status" class="status"></p>
+
+      <div class="sub-head">
+        <h3>配置 JSON</h3>
         <button data-focus class="copy" id="copy">复制 JSON</button>
       </div>
       <pre id="config-output">尚未配置</pre>
-      <p class="hint">每个站点的 T4 地址形如：<code>miniapp://com.leospring.cms_t4_bridge?site=souav</code></p>
     </section>
 
     <section class="panel endpoints">
       <h2>接口路径</h2>
-      <div class="endpoint"><code>GET /?site=souav&amp;filter=true</code><span>首页与分类</span></div>
-      <div class="endpoint"><code>GET /?site=souav&amp;t=1&amp;ac=videolist&amp;pg=1</code><span>分类列表</span></div>
-      <div class="endpoint"><code>GET /?site=souav&amp;wd=关键词&amp;pg=1</code><span>搜索</span></div>
-      <div class="endpoint"><code>GET /?site=souav&amp;ac=detail&amp;ids=影片ID</code><span>详情</span></div>
-      <div class="endpoint"><code>GET /?site=souav&amp;flag=线路&amp;play=播放地址</code><span>播放</span></div>
-      <div class="endpoint"><code>GET /config</code><span>多站点应用配置描述</span></div>
+      <p class="hint">下面是业务路径，前面接上当前地址前缀 <code id="prefix-sample">miniapp://com.leospring.cms_t4_bridge</code>；站点既能写成 <code>/site/souav</code>，也能写成 <code>?site=souav</code></p>
+      <div class="endpoint"><code>GET /site/souav?filter=true</code><span>首页与分类</span></div>
+      <div class="endpoint"><code>GET /site/souav?t=1&amp;ac=videolist&amp;pg=1</code><span>分类列表</span></div>
+      <div class="endpoint"><code>GET /site/souav?wd=关键词&amp;pg=1</code><span>搜索</span></div>
+      <div class="endpoint"><code>GET /site/souav?ac=detail&amp;ids=影片ID</code><span>详情</span></div>
+      <div class="endpoint"><code>GET /site/souav?flag=线路&amp;play=播放地址</code><span>播放</span></div>
+      <div class="endpoint"><code>GET /?ac=videolist&amp;t=1</code><span>省略站点，走默认站点</span></div>
+      <div class="endpoint"><code>GET /config</code><span>多站点配置，可用 <code>?base=</code> 指定返回的前缀</span></div>
+      <div class="endpoint"><code>GET /health</code><span>服务状态与站点数量</span></div>
     </section>
   </main>
   <script src="app.js"></script>

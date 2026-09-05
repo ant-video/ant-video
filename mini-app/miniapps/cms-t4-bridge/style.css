@@ -54,6 +54,40 @@ button:focus-visible, button.tv-focus { outline: 2px solid var(--accent); outlin
 .status.error { color: var(--danger); }
 .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 h2 { margin: 0; font-size: 16px; }
+h3 { margin: 0; font-size: 13px; color: var(--muted); font-weight: 600; }
+[hidden] { display: none !important; }
+
+.tabs { display: flex; gap: 6px; flex: 0 0 auto; }
+button.tab { min-height: 30px; padding: 4px 12px; border-radius: 999px; color: var(--muted); font-size: 12px; }
+button.tab.is-active { border-color: transparent; background: var(--accent); color: var(--accent-text); font-weight: 700; }
+
+.hero-link {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 16px; padding: 13px 14px; border: 1px solid rgba(82, 181, 75, 0.4);
+  border-radius: 8px; background: rgba(82, 181, 75, 0.08);
+}
+.hero-link-text { min-width: 0; display: grid; gap: 4px; }
+.hero-link-text span { color: var(--muted); font-size: 11px; letter-spacing: 0.6px; }
+.hero-link-text code { overflow-wrap: anywhere; font-size: 13px; user-select: all; }
+.hero-link button { flex: 0 0 auto; }
+
+.lan-form { margin-top: 16px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+.lan-form label { margin-bottom: 0; }
+.lan-form input { background: var(--surface); }
+.lan-form .actions { margin-top: 12px; }
+.lan-form .hint { margin-top: 12px; }
+
+.link-list { margin-top: 6px; }
+.link-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; border-top: 1px solid var(--line); }
+.link-meta { min-width: 0; display: grid; gap: 2px; }
+.link-meta strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.link-meta span { color: var(--muted); font-size: 11px; }
+.link-meta code { overflow-wrap: anywhere; color: #b9e5b4; font-size: 11.5px; user-select: all; }
+.link-item button { flex: 0 0 auto; }
+.link-list .hint { padding: 12px 0 2px; border-top: 1px solid var(--line); }
+
+.sub-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
+
 .site-list { margin-top: 18px; }
 .site-item { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 0; border-top: 1px solid var(--line); }
 .site-item.selected { border-left: 3px solid var(--accent); padding-left: 10px; }
@@ -64,8 +98,8 @@ h2 { margin: 0; font-size: 16px; }
 .site-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; flex: 0 0 auto; }
 .site-actions button { min-height: 32px; padding: 5px 9px; font-size: 12px; }
 button.danger { color: var(--danger); }
-pre { min-height: 88px; margin: 14px 0 10px; padding: 12px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; background: #101216; color: #cfe8cc; font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-word; }
-.hint { margin: 0; color: var(--dim); font-size: 12px; }
+pre { min-height: 88px; margin: 10px 0; padding: 12px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; background: #101216; color: #cfe8cc; font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-word; }
+.hint { margin: 10px 0 0; color: var(--dim); font-size: 12px; }
 code { color: #b9e5b4; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
 .endpoints h2 { margin-bottom: 10px; }
 .endpoint { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 9px 0; border-top: 1px solid var(--line); }
@@ -76,4 +110,7 @@ code { color: #b9e5b4; font-family: ui-monospace, SFMono-Regular, Menlo, monospa
   .site-actions { justify-content: flex-start; margin-top: 10px; }
   .endpoint { display: block; }
   .endpoint span { display: block; margin-top: 3px; }
+  .panel-head { flex-wrap: wrap; }
+  .hero-link, .link-item { display: block; }
+  .hero-link button, .link-item button { margin-top: 10px; }
 }

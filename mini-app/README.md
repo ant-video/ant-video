@@ -37,7 +37,7 @@ mini-app/
 | **启动参数接收器** `miniapps/launch-target/` | `com.leospring.launch_target` | ui / storage / navigate | 接收 `onOpen`、读取 `getLaunchOptions`，支持保活复用与详情页落地 |
 | **网页跳转示例** `miniapps/web-links/` | `com.leospring.web_links` | ui / navigate | 对比同源容器导航、外部 HTTPS 网站和系统协议的确认流程 |
 | **在线站点示例** `miniapps/online-site/` | `com.leospring.online_site` | — | 只有 manifest，直接包装 HTTPS 站点并使用宿主广告过滤 |
-| **CMS 转 T4 服务** `miniapps/cms-t4-bridge/` | `com.leospring.cms_t4_bridge` | ui / storage / network / service | 配置多个 CMS JSON 接口，按 `site` 提供 `miniapp://` T4 首页、分类、搜索、详情和配置接口 |
+| **CMS 转 T4 服务** `miniapps/cms-t4-bridge/` | `com.leospring.cms_t4_bridge` | ui / storage / network / service | 配置多个 CMS JSON 接口，按 `site` 提供 T4 首页、分类、搜索、详情和 `config` 接口，页面给出可复制的内部与局域网地址 |
 | **俄罗斯方块** `miniapps/tetris/` | `com.leospring.tetris` | ui / storage / navigate | 掌机复刻，Web Audio 音效 + LCD 光影；自带 `ant-mock.js`，浏览器里直接能玩 |
 | **影视库** `miniapps/emby/` | `com.leospring.emby` | ui / storage / navigate / player / source | Emby 风格四页面（首页 / 媒体库 / 搜索 / 详情），复用宿主已配置的采集源，续播记录存 `ant.storage` |
 
@@ -54,18 +54,30 @@ mini-app/
 ### CMS 转 T4 服务
 
 安装 `cms-t4-bridge` 后，在小程序页面添加多个 CMS JSON 接口，为每个接口设置唯一 `key`、显示名称和地址。
-它会注册一个后台服务，应用侧使用带站点参数的 T4 地址：
+它会注册一个后台服务，应用侧使用按站点区分的 T4 地址（站点走路径，后面能直接接 `?ac=…`；
+`?site=站点key` 的查询串写法同样受理）：
 
-- `/?site=站点key&filter=true`：CMS 首页转 T4 首页与分类
-- `/?site=站点key&t=分类ID&ac=videolist&pg=1`：分类分页，T4 的 `ext` 会转成 CMS 查询参数
-- `/?site=站点key&wd=关键词&pg=1`：搜索
-- `/?site=站点key&ac=detail&ids=影片ID`：详情
-- `/?site=站点key&flag=线路&play=播放地址`：将 CMS 选集中的直链转换为 T4 播放响应
-- `/config` 或 `/api/config`：严格返回 `{ "sites": [{ "key", "name", "type": 4, "api" }] }`
+- `/site/站点key?filter=true`：CMS 首页转 T4 首页与分类
+- `/site/站点key?t=分类ID&ac=videolist&pg=1`：分类分页，T4 的 `ext` 会转成 CMS 查询参数
+- `/site/站点key?wd=关键词&pg=1`：搜索
+- `/site/站点key?ac=detail&ids=影片ID`：详情
+- `/site/站点key?flag=线路&play=播放地址`：将 CMS 选集中的直链转换为 T4 播放响应
+- `/config` 或 `/api/config`：严格返回 `{ "sites": [{ "key", "name", "type": 4, "api", "searchable", "quickSearch", "filterable" }] }`
+- `/health`：服务状态与已配置的站点数
 
-当只有一个站点，`site` 可以省略；多个站点省略时使用小程序中设置的默认站点。
+省略站点时用小程序里设为默认的那个站点。
 
-服务必须保持在宿主中安装且未被用户结束；需要给其它设备使用时，可在宿主的小程序详情里打开局域网共享。
+页面的「对外接口」面板直接给出可复制的地址，两种前缀切换：
+
+- **宿主内部**：`miniapp://com.leospring.cms_t4_bridge/config`，供宿主自己的设置项和其它小程序引用
+- **局域网**：把宿主「小程序设置 → 局域网共享」里的 `http://IP:9321/<lanToken>` 粘进面板，
+  页面据此生成 `http://IP:9321/<lanToken>/config` 和每个站点的地址，给同网络的设备和第三方播放器用
+
+`/config` 返回的 `api` 前缀跟着调用方来源走：局域网请求拿到局域网地址，宿主内部请求拿到 `miniapp://`，
+也可以用 `?base=` 显式指定。局域网请求进来一次后，页面会自己认出那个地址（宿主没有读取它的 JSAPI）。
+
+服务必须保持在宿主中安装且未被用户结束；需要给其它设备使用时，可在宿主的小程序详情里打开局域网共享——
+地址里的 token 就是唯一凭证，别在公共网络里外传。
 
 ## 五分钟上手
 
