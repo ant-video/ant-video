@@ -1,0 +1,15 @@
+{
+  "appId": "com.leospring.lx_music_node",
+  "name": "LX Music",
+  "version": "1.0.0",
+  "versionCode": 10000,
+  "renderer": "webview",
+  "entry": "web/index.html",
+  "permissions": ["node", "ui", "storage", "network", "miniapp"],
+  "node": {
+    "entry": "server/index.js",
+    "config": "server/index.config.js"
+  },
+  "description": "LX Music：内置 Node 服务代理 lxserver，支持搜索/歌单/排行榜/播放器，音源脚本可自定义",
+  "icon": "https://raw.githubusercontent.com/XCQ0607/lxserver/main/public/music/assets/logo.svg"
+}

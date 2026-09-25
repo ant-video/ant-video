@@ -1,0 +1,16 @@
+{
+  "name": "lx-music-node",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "needle": "^3.5.0",
+    "vm2": "^3.12.2"
+  }
+}

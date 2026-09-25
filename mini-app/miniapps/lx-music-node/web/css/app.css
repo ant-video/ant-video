@@ -1,0 +1,1268 @@
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Glassmorphism utilities */
+.glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.active-tab {
+    background-color: var(--c-50);
+    color: var(--c-600);
+    border-right: 3px solid var(--c-600);
+}
+
+.active-sub-item {
+    color: var(--c-600) !important;
+}
+
+/* ==========================================================================
+   侧边栏歌单项：丝滑动滑动效（动态放大缩小、悬浮变宽占满bar空间）
+   ========================================================================== */
+.playlist-sidebar-item {
+    position: relative;
+    margin: 2px 4px;
+    padding: 5px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    user-select: none;
+    transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+                margin 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+                padding 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+                background-color 0.18s ease,
+                box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    transform-origin: center left;
+    will-change: transform, margin, padding;
+}
+
+/* 鼠标悬浮：丝滑放大、向两侧自然扩展变宽、充分利用侧边栏空间、浮雕微光影 */
+.playlist-sidebar-item:hover {
+    margin-left: 1px;
+    margin-right: 1px;
+    padding-left: 9px;
+    padding-right: 7px;
+    transform: scale(1.02);
+    z-index: 10;
+    box-shadow: 0 4px 14px -2px rgba(0, 0, 0, 0.1), 0 0 0 1px color-mix(in srgb, var(--c-500) 22%, transparent);
+}
+
+:root[data-appearance="dark"] .playlist-sidebar-item:hover {
+    box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.45), 0 0 0 1px color-mix(in srgb, var(--c-500) 28%, transparent);
+}
+
+/* 选中高亮状态 */
+.playlist-sidebar-item.active-sub-item {
+    background-color: color-mix(in srgb, var(--c-500) 14%, transparent) !important;
+    color: var(--c-600) !important;
+    font-weight: 500;
+}
+
+:root[data-appearance="dark"] .playlist-sidebar-item.active-sub-item {
+    background-color: color-mix(in srgb, var(--c-500) 20%, transparent) !important;
+}
+
+/* 拖拽排序时抑制放大，避免动画重叠抖动 */
+.sortable-ghost,
+.sortable-chosen {
+    transform: none !important;
+}
+
+/* 拖拽手柄紧凑微调 */
+.playlist-sidebar-item .favorite-sidebar-drag-handle {
+    margin-right: 5px;
+}
+
+/* 图标微悬浮动效 */
+.playlist-sidebar-item .sidebar-item-icon {
+    width: 1.15rem;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s ease;
+}
+
+.playlist-sidebar-item:hover .sidebar-item-icon {
+    transform: scale(1.12);
+    color: var(--c-500);
+}
+
+/* 侧边栏歌曲数量微调 */
+.playlist-sidebar-item .sidebar-item-count {
+    margin-right: 3px;
+    font-size: 11.5px;
+}
+
+/* 歌单名称无缝从右到左匀速跑马灯：仅在鼠标悬浮且溢出时触发，移出立即停止并复位 */
+.playlist-sidebar-item .playlist-name-track {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    width: 100%;
+}
+
+.playlist-sidebar-item.is-marquee-active .playlist-name-wrapper {
+    mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+}
+
+.playlist-sidebar-item.is-marquee-active .playlist-name-track {
+    display: inline-flex !important;
+    width: max-content !important;
+    animation: sidebar-name-marquee var(--sidebar-marquee-duration, 8s) linear infinite;
+    animation-delay: 0.35s;
+    will-change: transform;
+}
+
+.playlist-sidebar-item.is-marquee-active .playlist-name-text {
+    display: inline-block !important;
+    width: max-content !important;
+    max-width: none !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: nowrap !important;
+    padding-right: 2rem !important;
+    flex-shrink: 0;
+}
+
+.playlist-sidebar-item.is-marquee-active .playlist-name-copy {
+    display: inline-block !important;
+    width: max-content !important;
+    white-space: nowrap !important;
+    padding-right: 2rem !important;
+    flex-shrink: 0;
+}
+
+@keyframes sidebar-name-marquee {
+    0% {
+        transform: translateX(0);
+    }
+
+    100% {
+        transform: translateX(-50%);
+    }
+}
+
+/* 侧边栏操作按钮组：仅悬浮或选中时展示，紧凑精致 */
+.playlist-sidebar-item .sidebar-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 1.5px;
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: max-width 0.15s ease, opacity 0.12s ease;
+}
+
+.playlist-sidebar-item:hover .sidebar-item-actions,
+.playlist-sidebar-item.active-sub-item .sidebar-item-actions {
+    max-width: 200px;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.playlist-sidebar-item .action-btn {
+    width: 19px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    color: #9ca3af;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.playlist-sidebar-item .action-btn i {
+    font-size: 10px;
+}
+
+.playlist-sidebar-item .action-btn:hover {
+    background-color: color-mix(in srgb, var(--c-500) 18%, transparent);
+    color: var(--c-500) !important;
+    transform: scale(1.15);
+}
+
+.playlist-sidebar-item .action-btn:active {
+    transform: scale(0.95);
+}
+
+.playlist-sidebar-item .action-btn.delete-btn:hover {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: #ef4444 !important;
+}
+.playlist-sidebar-item .action-btn.delete-btn:hover i {
+    color: #ef4444 !important;
+}
+
+.active-sub-item i {
+    color: var(--c-600) !important;
+}
+
+.active-sub-item .sidebar-item-actions .action-btn i {
+    color: #9ca3af !important;
+}
+
+.active-sub-item .sidebar-item-actions .action-btn:hover i {
+    color: var(--c-500) !important;
+}
+
+.active-sub-item .sidebar-item-actions .action-btn.delete-btn:hover i {
+    color: #ef4444 !important;
+}
+
+/* ==========================================================================
+   移动端专属紧凑布局：图标更靠近、间距缩小，充分留出歌单名称空间
+   ========================================================================== */
+@media (max-width: 767px) {
+    .playlist-sidebar-item {
+        margin: 2px !important;
+        padding: 5px 6px !important;
+    }
+
+    /* 左侧手柄与图标更靠近 */
+    .playlist-sidebar-item .favorite-sidebar-drag-handle {
+        margin-right: 3px !important;
+    }
+
+    .playlist-sidebar-item .favorite-sidebar-drag-handle i {
+        font-size: 10px !important;
+    }
+
+    .playlist-sidebar-item .sidebar-item-icon {
+        width: 1rem !important;
+    }
+
+    .playlist-sidebar-item > div.overflow-hidden {
+        margin-left: 4px !important;
+    }
+
+    /* 右侧歌曲计数紧凑靠拢 */
+    .playlist-sidebar-item .sidebar-item-count {
+        margin-right: 2px !important;
+        font-size: 10.5px !important;
+    }
+
+    /* 右侧操作按钮间距极大缩小、彼此紧密靠近 */
+    .playlist-sidebar-item .sidebar-item-actions {
+        gap: 1px !important;
+        max-width: 0;
+        opacity: 0;
+    }
+
+    .playlist-sidebar-item:hover .sidebar-item-actions,
+    .playlist-sidebar-item.active-sub-item .sidebar-item-actions {
+        max-width: 150px !important;
+        opacity: 1 !important;
+    }
+
+    .playlist-sidebar-item .action-btn {
+        width: 17px !important;
+        height: 20px !important;
+        padding: 0 !important;
+    }
+
+    .playlist-sidebar-item .action-btn i {
+        font-size: 9.5px !important;
+    }
+}
+
+/* Lyric View Styles */
+.mask-image-gradient {
+    mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+}
+
+.mask-image-linear-fade {
+    mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* 彻底消除侧边抽屉在隐藏状态下的阴影与边缘线残留 */
+#queue-drawer.translate-x-full,
+#cache-drawer.translate-x-full,
+#download-drawer.translate-x-full {
+    box-shadow: none !important;
+    border-left-width: 0 !important;
+}
+
+/* Setting Tooltip Styles */
+.setting-tooltip-trigger {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-left: 0.375rem;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: color 0.2s;
+    vertical-align: middle;
+}
+
+.setting-tooltip-trigger:hover {
+    color: var(--c-500);
+}
+
+.setting-tooltip-content {
+    position: absolute;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    width: 16rem;
+    max-width: calc(100vw - 2rem);
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--c-100);
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    font-size: 0.75rem;
+    font-weight: normal;
+    line-height: 1.4;
+    color: #4b5563;
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dark .setting-tooltip-content {
+    background: rgba(31, 41, 55, 0.95);
+    border-color: rgba(75, 85, 99, 0.3);
+    color: #d1d5db;
+}
+
+/* Triangle notch */
+.setting-tooltip-content::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 6px;
+    border-style: solid;
+    border-color: rgba(255, 255, 255, 0.95) transparent transparent;
+}
+
+.dark .setting-tooltip-content::after {
+    border-color: rgba(31, 41, 55, 0.95) transparent transparent;
+}
+
+/* Show on hover (Desktop) */
+@media (hover: hover) {
+    .setting-tooltip-trigger:hover .setting-tooltip-content {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* Active state for mobile click */
+.setting-tooltip-trigger.is-active .setting-tooltip-content {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
+}
+
+.lyric-line {
+    font-family: var(--lyric-font-family, inherit);
+    font-size: var(--lyric-font-size, 1.25rem);
+    line-height: 1.4;
+    /* 基础行高由内部元素撑开 */
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    cursor: pointer;
+    opacity: 0.6;
+    transform-origin: left center;
+
+    /* Wrapping constraints */
+    width: fit-content;
+    max-width: 100%;
+    padding: 0.6em 2rem 0.6em 1.5rem;
+    /* 使用 em，随字号缩放行间距 */
+    box-sizing: border-box;
+    white-space: normal;
+    overflow-wrap: break-word;
+}
+
+/* Centered origin for mobile */
+@media (max-width: 1024px) {
+    .lyric-line {
+        transform-origin: center center;
+        margin: 0 auto;
+    }
+}
+
+/* Force center origin/alignment when cover is hidden (desktop) */
+.lyrics-centered .lyric-line {
+    transform-origin: center center !important;
+    margin: 0 auto;
+    text-align: center !important;
+}
+
+.lyrics-centered .lyric-line span {
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+.lyric-line:hover {
+    opacity: 0.8;
+}
+
+.lyric-line.active {
+    opacity: 1;
+    font-weight: 800;
+    color: var(--c-500);
+    z-index: 10;
+    /* 确保高亮行在最上层，阴影不被覆盖 */
+    overflow: visible;
+    /* 允许阴影和放大后的文字溢出显示 */
+    /* transform: scale(1.15); REMOVED */
+    font-size: calc(var(--lyric-font-size, 1.25rem) * 1.3);
+}
+
+/* 当歌词居中展示时，移除封面留下的间距占位 */
+#player-detail-container.has-centered-lyrics {
+    gap: 0 !important;
+}
+
+/* Karaoke Word Styles */
+.lyric-line .word-item {
+    position: relative;
+    display: inline-block;
+    transition: filter 0.2s ease-out;
+    white-space: pre-wrap;
+    pointer-events: none;
+}
+
+.lyric-line.active .word-item {
+    /* 播放过的部分(左侧)是主题色，未播放(右侧)为浅灰色 
+       实现平滑的扫过效果 */
+    background: linear-gradient(to right,
+            var(--c-500) var(--word-progress, 0%),
+            #999 var(--word-progress, 0%));
+    background-clip: text;
+    -webkit-background-clip: text;
+    /* 必须保持透明，才能显示底层的背景渐变！ */
+    -webkit-text-fill-color: transparent;
+}
+
+/* 正在扫过（演唱中）及已唱过去的字，显示主题荧光 */
+.enable-lyric-glow .lyric-line.active .word-item.playing,
+.enable-lyric-glow .lyric-line.active .word-item.passed {
+    filter: drop-shadow(0 4px 12px var(--c-200));
+}
+
+
+/* 对于不支持逐字的普通歌词及其翻译，直接点亮 (没有平滑动效) */
+.lyric-line.active .plain-lyric {
+    color: var(--c-500);
+}
+
+.lyric-line.active .extended {
+    opacity: 0.8;
+    font-weight: 500;
+    color: var(--c-500);
+}
+
+/* 对于支持逐字的歌词的翻译/罗马音，现在改为逐字点亮 */
+.lyric-line.has-words.active .extended {
+    color: #9CA3AF;
+    /* gray-400 */
+    background: none;
+    -webkit-text-fill-color: initial;
+    background-clip: initial;
+}
+
+.lyric-line.has-words.active .extended .ext-item {
+    display: inline-block;
+    background: linear-gradient(to right,
+            var(--c-500) var(--word-progress, 0%),
+            #9CA3AF var(--word-progress, 0%));
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    transition: none;
+    /* 由 JS 循环控制平滑度 */
+    white-space: pre;
+}
+
+/* 仅对正在点亮或已点亮的翻译字符应用荧光效果，保持 0 2px 8px 的朦胧参数 */
+.enable-lyric-glow .lyric-line.active .extended .ext-item.playing,
+.enable-lyric-glow .lyric-line.active .extended .ext-item.passed {
+    filter: drop-shadow(0 2px 8px var(--c-200));
+}
+
+/* 普通歌词(非逐字)或没有切分的歌词依然维持整体荧光 */
+.enable-lyric-glow .lyric-line.active .plain-lyric {
+    filter: drop-shadow(0 2px 8px var(--c-200));
+}
+
+/* Scroll target - 用户滚动时对准的歌词 */
+.lyric-line.scroll-target {
+    color: #f97316;
+    /* orange-500 */
+    opacity: 1;
+    /* transform: scale(1.1); REMOVED */
+    font-size: calc(var(--lyric-font-size, 1.25rem) * 1.15);
+    font-weight: 700;
+}
+
+.enable-lyric-glow .lyric-line.scroll-target {
+    text-shadow: 0 2px 10px rgba(249, 115, 22, 0.2);
+}
+
+/* Mobile Sidebar Transition */
+#mobile-sidebar-backdrop {
+    transition: opacity 0.3s ease-in-out;
+}
+
+aside {
+    transition: transform 0.3s ease-in-out;
+}
+
+@keyframes marquee {
+    0% {
+        transform: translateX(0);
+    }
+
+    100% {
+        transform: translateX(-50%);
+    }
+}
+
+.animate-marquee {
+    display: inline-block;
+    animation: marquee 10s linear infinite;
+}
+
+/* Default: Always Run (for Touch/Mobile) */
+.hover-scroll-paused {
+    animation-play-state: running;
+}
+
+/* Desktop: Pause by default, run on hover */
+@media (hover: hover) {
+    .hover-scroll-paused {
+        animation-play-state: paused;
+    }
+
+    .group:hover .hover-scroll-paused {
+        animation-play-state: running;
+    }
+}
+
+.force-visible {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* 菜单选中项样式 */
+.active-option {
+    background-color: var(--c-500) !important;
+    color: #fff !important;
+    box-shadow: 0 4px 12px var(--c-200);
+}
+
+[data-appearance="dark"] .active-option {
+    background-color: var(--c-600) !important;
+    color: #fff !important;
+}
+
+.active-option i,
+.active-option span {
+    color: #fff !important;
+}
+
+/* Sleep Timer Styles */
+.timer-preset-btn {
+    padding: 0.75rem 1rem;
+    background-color: #f9fafb;
+    color: #4b5563;
+    font-weight: 700;
+    border-radius: 1rem;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+    font-size: 0.875rem;
+    text-align: center;
+}
+
+.timer-preset-btn:hover {
+    background-color: #ecfdf5;
+    color: #059669;
+    border-color: #d1fae5;
+    transform: translateY(-1px);
+}
+
+.timer-preset-btn:active {
+    transform: translateY(0);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.animate-slide-up {
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Lyric Font Size Variable */
+:root {
+    --lyric-font-size: 1.25rem;
+}
+
+.lyric-line .font-lrc {
+    font-size: 1.1em !important;
+    /* 基础字号略微放大 */
+    line-height: 1.4;
+    display: block;
+}
+
+.lyric-line .extended {
+    font-size: 0.75em !important;
+    line-height: 1.4;
+    margin-top: 0.4em;
+    /* 翻译与原文的间距：随字号缩放 */
+    display: block;
+    opacity: 0.8;
+}
+
+/* 隐藏滚动条但保留滚动能力 */
+.hide-scrollbar {
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+    display: none;
+    /* Chrome, Safari and Opera */
+}
+
+/* Expand Button Faint Style */
+#btn-expand-panel.faint,
+#btn-toggle-lyrics.faint {
+    opacity: 0.15 !important;
+    background-color: rgba(255, 255, 255, 0.4) !important;
+    border-color: rgba(200, 200, 200, 0.2) !important;
+}
+
+#btn-expand-panel.faint:hover,
+#btn-toggle-lyrics.faint:hover {
+    opacity: 1 !important;
+    background-color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+    width: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(16, 185, 129, 0.3);
+}
+
+/* Detail Title multi-line support */
+#detail-title {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    white-space: normal !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.25;
+}
+
+#detail-title-container {
+    white-space: normal !important;
+}
+
+/* Lyric Card Share - Button States */
+.lc-layout-btn,
+.lc-color-btn,
+.lc-lines-btn {
+    color: #6b7280;
+    border-color: #e5e7eb;
+    background: #f9fafb;
+}
+
+.lc-layout-btn:hover,
+.lc-color-btn:hover,
+.lc-lines-btn:hover {
+    border-color: var(--c-300);
+    color: var(--c-600);
+    background: var(--c-50);
+}
+
+.lc-btn-active {
+    border-color: var(--c-500) !important;
+    color: var(--c-600) !important;
+    background: var(--c-50) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-500) 15%, transparent);
+}
+
+/* Lyric Card - 主题色滑动条 */
+.lc-range-input {
+    accent-color: var(--c-500);
+}
+
+/* Sortable Styles (Direct Move Mode) */
+.sortable-ghost-solid {
+    opacity: 1 !important;
+    border: 2px solid var(--c-500) !important;
+    background: var(--c-50) !important;
+    box-shadow: inset 0 0 0 2px var(--c-100) !important;
+}
+
+.sortable-chosen-item {
+    opacity: 1 !important;
+    position: relative;
+    z-index: 10;
+}
+
+.sortable-drag-item {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+.select-none {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+}
+
+/* Silky Animation for Player Detail */
+#view-player-detail {
+    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s ease-out !important;
+    will-change: transform, opacity;
+}
+
+#view-player-detail.translate-y-\[100\%\] #player-detail-container {
+    transform: scale(0.92) translateY(40px);
+    opacity: 0;
+}
+
+#player-detail-container {
+    transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.6s ease-out;
+    will-change: transform, opacity;
+}
+
+#player-footer {
+    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    will-change: transform;
+}
+
+/* Buffering status dots animation */
+@keyframes loading-bounce {
+
+    0%,
+    80%,
+    100% {
+        transform: translateY(0);
+        opacity: 0.5;
+    }
+
+    40% {
+        transform: translateY(-4px);
+        opacity: 1;
+    }
+}
+
+.animate-loading-dots span {
+    display: inline-block;
+    animation: loading-bounce 1.4s infinite ease-in-out;
+}
+
+.animate-loading-dots span:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.animate-loading-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.animate-loading-dots span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+/* Music Visualizer Loader */
+@keyframes music-bar-animate {
+
+    0%,
+    100% {
+        transform: scaleY(0.3);
+        opacity: 0.3;
+    }
+
+    50% {
+        transform: scaleY(1.2);
+        opacity: 1;
+    }
+}
+
+.music-visualizer-loader {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    height: 60px;
+}
+
+.music-visualizer-loader div {
+    width: 5px;
+    height: 40px;
+    background: var(--c-500);
+    border-radius: 3px;
+    box-shadow: 0 0 15px color-mix(in srgb, var(--c-500) 40%, transparent);
+    animation: music-bar-animate 1.2s infinite ease-in-out;
+}
+
+.music-visualizer-loader div:nth-child(1) {
+    animation-delay: 0.0s;
+}
+
+.music-visualizer-loader div:nth-child(2) {
+    animation-delay: 0.1s;
+}
+
+.music-visualizer-loader div:nth-child(3) {
+    animation-delay: 0.2s;
+}
+
+.music-visualizer-loader div:nth-child(4) {
+    animation-delay: 0.3s;
+}
+
+.music-visualizer-loader div:nth-child(5) {
+    animation-delay: 0.4s;
+}
+
+.music-visualizer-loader div:nth-child(6) {
+    animation-delay: 0.3s;
+}
+
+.music-visualizer-loader div:nth-child(7) {
+    animation-delay: 0.2s;
+}
+
+.music-visualizer-loader div:nth-child(8) {
+    animation-delay: 0.1s;
+}
+
+.music-visualizer-loader div:nth-child(9) {
+    animation-delay: 0.0s;
+}
+
+/* Search Match Highlights - Consistently use theme color-mix */
+.search-match {
+    background-color: color-mix(in srgb, var(--c-500) 10%, transparent) !important;
+    border-radius: 0.75rem;
+}
+
+.search-current {
+    background-color: color-mix(in srgb, var(--c-500) 25%, transparent) !important;
+    box-shadow: inset 0 0 0 2px var(--c-500) !important;
+    border-radius: 0.75rem;
+}
+
+.row-selected {
+    background-color: color-mix(in srgb, var(--c-500) 15%, transparent) !important;
+    border-radius: 0.75rem;
+}
+
+/* Dark mode refinements: Use deeper theme mix instead of plain white */
+:root[data-appearance="dark"] .search-match {
+    background-color: color-mix(in srgb, var(--c-500) 12%, transparent) !important;
+}
+
+:root[data-appearance="dark"] .search-current {
+    background-color: color-mix(in srgb, var(--c-500) 30%, transparent) !important;
+    box-shadow: inset 0 0 0 2px var(--c-500), 0 0 15px color-mix(in srgb, var(--c-500) 30%, transparent) !important;
+}
+
+:root[data-appearance="dark"] .row-selected {
+    background-color: color-mix(in srgb, var(--c-500) 18%, transparent) !important;
+}
+
+/* 响应式侧边栏优化：针对垂直高度不足的情况 */
+@media (max-height: 845px) {
+
+    /* 压缩导航栏间距 */
+    #main-sidebar nav ul li a,
+    #main-sidebar nav ul li div[onclick] {
+        padding-top: 0.4rem !important;
+        padding-bottom: 0.4rem !important;
+    }
+
+    /* 迷你播放器改为横向布局 */
+    #sidebar-song-info:not(.hidden) {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 0.75rem !important;
+        padding: 0.75rem 1rem !important;
+        text-align: left !important;
+    }
+
+    #sidebar-cover {
+        width: 3.25rem !important;
+        height: 3.25rem !important;
+        margin-bottom: 0 !important;
+        border-radius: 0.5rem !important;
+    }
+
+    #sidebar-song-info>div.text-center {
+        text-align: left !important;
+        align-items: flex-start !important;
+        flex: 1;
+        min-width: 0;
+    }
+
+    #sidebar-song-name {
+        font-size: 0.8rem !important;
+        line-height: 1.25;
+    }
+
+    #sidebar-singer {
+        font-size: 0.7rem !important;
+        line-height: 1.2;
+    }
+
+    /* 压缩底部版权信息 */
+    .sidebar-copyright-text {
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+    }
+}
+
+/* ── 通用控件基础样式 (Filter Tag, Select, Custom Trigger) ── */
+.lm-filter-tag, .lm-select, .cs-trigger {
+    font-size: 11px;
+    font-weight: 600;
+    border: 1.5px solid var(--border-main);
+    background-color: var(--bg-panel);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.lm-filter-tag:hover, .lm-select:hover, .cs-trigger:hover {
+    border-color: var(--c-400);
+    color: var(--c-500);
+}
+
+.lm-filter-tag.active, .lm-select.active, .cs-wrapper.highlight .cs-trigger {
+    background-color: var(--c-500);
+    border-color: var(--c-500);
+    color: #fff;
+}
+
+.lm-select:focus, .cs-wrapper.active .cs-trigger {
+    border-color: var(--c-500);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-500) 20%, transparent);
+    color: var(--text-main);
+}
+
+/* ── 多选筛选标签组特有样式 ── */
+.lm-filter-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    min-height: 30px;
+    align-items: center;
+}
+
+.lm-filter-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+    line-height: 1.6;
+}
+
+.lm-filter-tag:hover {
+    background-color: color-mix(in srgb, var(--c-500) 8%, var(--bg-panel));
+}
+
+.lm-filter-tag.active {
+    box-shadow: 0 1px 4px color-mix(in srgb, var(--c-500) 40%, transparent);
+}
+
+.lm-filter-tag.active:hover {
+    background-color: var(--c-600);
+    border-color: var(--c-600);
+}
+
+/* ── 统一风格的单选 select 特有样式 ── */
+.lm-select {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    padding: 3px 24px 3px 8px;
+    border-radius: 6px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 7px center;
+    outline: none;
+    line-height: 1.6;
+    min-height: 26px;
+}
+
+.lm-select.active {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23ffffff'/%3E%3C/svg%3E");
+}
+
+/* ── 自定义下拉组件基础样式 ── */
+.cs-wrapper {
+    display: inline-block;
+    vertical-align: middle;
+    user-select: none;
+    cursor: pointer;
+}
+/* 继承布局 */
+.cs-wrapper.flex-1 { flex: 1; }
+.cs-wrapper.flex-none { flex: none; }
+.cs-wrapper.shrink-0 { flex-shrink: 0; }
+
+.cs-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 4px 10px;
+    border-radius: 10px;
+    min-height: 28px;
+    box-sizing: border-box;
+}
+
+.cs-trigger-text {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+}
+
+.cs-trigger-icon {
+    font-size: 8px;
+    transition: transform 0.2s ease;
+    margin-left: 8px;
+}
+.cs-wrapper.active .cs-trigger-icon { transform: rotate(180deg); }
+.cs-wrapper.highlight .cs-trigger-icon { color: #fff; }
+
+/* Portal 模式下的下拉框 */
+.cs-dropdown {
+    position: absolute;
+    z-index: 9999; /* 必须足够高以穿透所有容器 */
+    background: var(--bg-panel);
+    border: 1.5px solid var(--border-main);
+    border-radius: 12px;
+    box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.2), 0 10px 15px -10px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+    pointer-events: none;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.15);
+    overflow: hidden;
+    max-height: 280px;
+    overflow-y: auto;
+    min-width: 120px;
+}
+.cs-dropdown.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+/* 向上弹出的动画调整 */
+.cs-dropdown.open-up {
+    transform: translateY(-10px) scale(0.95);
+}
+.cs-dropdown.open-up.visible {
+    transform: translateY(0) scale(1);
+}
+
+.cs-options { padding: 5px; list-style: none; margin: 0; }
+.cs-option {
+    padding: 8px 12px;
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 8px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.cs-option:hover {
+    background: color-mix(in srgb, var(--c-500) 10%, var(--bg-panel));
+    color: var(--c-600);
+    padding-left: 14px;
+}
+.cs-option.selected {
+    background: var(--c-500);
+    color: #fff !important;
+    font-weight: 700;
+}
+.cs-option i { font-size: 9px; opacity: 0; }
+.cs-option.selected i { opacity: 1; }
+
+/* 暗色模式微调 */
+.dark .cs-dropdown {
+    background: rgba(31, 41, 55, 0.9);
+    box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.4);
+}
+
+/* 子目录选择按钮适配 */
+.subpath-btn-active {
+    border-color: var(--c-500) !important;
+    background-color: var(--c-50) !important;
+}
+:root[data-appearance="dark"] .subpath-btn-active,
+.dark .subpath-btn-active {
+    background-color: color-mix(in srgb, var(--c-500) 15%, transparent) !important;
+}
+.subpath-btn-active i,
+.subpath-btn-active span {
+    color: var(--c-600) !important;
+}
+:root[data-appearance="dark"] .subpath-btn-active i,
+:root[data-appearance="dark"] .subpath-btn-active span,
+.dark .subpath-btn-active i,
+.dark .subpath-btn-active span {
+    color: var(--c-300) !important;
+}
+
+.subpath-btn-inactive {
+    border-color: var(--border-main) !important;
+    background-color: transparent !important;
+}
+.subpath-btn-inactive:hover {
+    border-color: var(--c-500) !important;
+    background-color: color-mix(in srgb, var(--c-500) 8%, var(--bg-panel)) !important;
+}
+.subpath-btn-inactive i {
+    color: var(--text-muted) !important;
+}
+.subpath-btn-inactive span {
+    color: var(--text-main) !important;
+}
+.subpath-btn-inactive:hover i,
+.subpath-btn-inactive:hover span {
+    color: var(--c-500) !important;
+}
+
+/* ── 搜索框布尔运算符标签 (方框浅色字符) ── */
+.lm-op-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+    margin: 0 2px;
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-weight: 700;
+    font-size: 11px;
+    line-height: 1.4;
+    user-select: none;
+    background-color: color-mix(in srgb, var(--c-500) 12%, var(--bg-panel));
+    color: var(--c-600);
+    border: 1px solid color-mix(in srgb, var(--c-500) 40%, transparent);
+    vertical-align: middle;
+}
+:root[data-appearance="dark"] .lm-op-tag,
+.dark .lm-op-tag {
+    background-color: color-mix(in srgb, var(--c-500) 22%, transparent);
+    color: var(--c-300);
+    border-color: color-mix(in srgb, var(--c-500) 50%, transparent);
+}
+
+.lm-rich-search-input:empty::before {
+    content: attr(data-placeholder);
+    color: var(--text-muted);
+    opacity: 0.65;
+    pointer-events: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    max-width: 100%;
+}
+
+/* ── 搜索框语法错误红框高亮 ── */
+.lm-search-input-error {
+    border-color: #ef4444 !important;
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.35) !important;
+}
+:root[data-appearance="dark"] .lm-search-input-error,
+.dark .lm-search-input-error {
+    border-color: #f87171 !important;
+    box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.4) !important;
+}
+
+

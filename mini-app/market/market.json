@@ -1,24 +1,6 @@
 {
   "apps": [
     {
-      "appId": "com.leospring.anttv",
-      "name": "蚂蚁TV",
-      "version": "1.3.0",
-      "versionCode": 13,
-      "url": "https://ghfast.top/https://raw.githubusercontent.com/ant-video/ant-video/refs/heads/main/mini-app/market/zip/蚂蚁TV_v1.3.0_筛选面板通用解析修复.zip",
-      "author": "瓜 (￢_￢)瞄",
-      "description": "蚂蚁TV：筛选面板通用解析器（兼容CMS全局/TVBox按分类分组/红果元组格式，切换分类自动更新筛选，按分类存储选择）"
-    },
-    {
-      "appId": "com.leospring.yangke",
-      "name": "羊壳TV",
-      "version": "1.0.3",
-      "versionCode": 4,
-      "url": "https://ghfast.top/https://raw.githubusercontent.com/ant-video/ant-video/refs/heads/main/mini-app/market/zip/羊壳TV_v1.0.3_网页嗅探器Pro.zip",
-      "author": "瓜 (￢_￢)瞄",
-      "description": "羊壳TV：PeekPro风格UI+实验室+网页嗅探器Pro（自定义请求头/POST/响应头/深度资源提取）"
-    },
-    {
       "appId": "com.logvar.danmu",
       "name": "LogVar 弹幕服务",
       "version": "1.20.10",

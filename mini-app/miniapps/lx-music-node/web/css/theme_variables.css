@@ -1,0 +1,328 @@
+/* 
+   Theme Variables 
+   Defines the color palettes for the application.
+   The 'emerald' palette in Tailwind will be mapped to these --c-* variables.
+*/
+
+:root {
+    /* Base Transition */
+    --theme-transition: 0.3s ease;
+
+    /* Light Mode Grays (Default) */
+    --bg-main: #f9fafb;
+    /* gray-50 */
+    --bg-panel: #fff;
+    /* white */
+    --bg-item-hover: #f3f4f6;
+    /* gray-100 */
+    --bg-header: rgba(255, 255, 255, 0.8);
+    --bg-glass: rgba(255, 255, 255, 0.7);
+    --text-main: #1f2937;
+    /* gray-800 */
+    --text-muted: #4b5563;
+    /* gray-600 */
+    --text-dim: #9ca3af;
+    /* gray-400 */
+    --border-main: #f1f1f1;
+    /* gray-100 */
+    --border-dim: #e5e7eb;
+    /* gray-200 */
+    --shadow-main: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark Mode Overrides */
+:root[data-appearance="dark"] {
+    --bg-main: #111827;
+    /* gray-900 */
+    --bg-panel: #1f2937;
+    /* gray-800 */
+    --bg-item-hover: #374151;
+    /* gray-700 */
+    --bg-header: rgba(17, 24, 39, 0.8);
+    --bg-glass: rgba(31, 41, 55, 0.7);
+    --text-main: #f9fafb;
+    /* gray-50 */
+    --text-muted: #d1d5db;
+    /* gray-300 */
+    --text-dim: #6b7280;
+    /* gray-500 */
+    --border-main: #374151;
+    /* gray-700 */
+    --border-dim: #4b5563;
+    /* gray-600 */
+    --shadow-main: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+}
+
+/* System Preference (Default if no data-appearance is set) */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-appearance="light"]) {
+        --bg-main: #111827;
+        --bg-panel: #1f2937;
+        --bg-item-hover: #374151;
+        --bg-header: rgba(17, 24, 39, 0.8);
+        --bg-glass: rgba(31, 41, 55, 0.7);
+        --text-main: #f9fafb;
+        --text-muted: #d1d5db;
+        --text-dim: #6b7280;
+        --border-main: #374151;
+        --border-dim: #4b5563;
+        --shadow-main: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+    }
+}
+
+/* 默认主题: 森之韵 (Forest Rhythm) - Emerald */
+:root[data-theme="emerald"] {
+    --c-50: #ecfdf5;
+    --c-100: #d1fae5;
+    --c-200: #a7f3d0;
+    --c-300: #6ee7b7;
+    --c-400: #34d399;
+    --c-500: #10b981;
+    --c-600: #059669;
+    --c-700: #047857;
+    --c-800: #065f46;
+    --c-900: #064e3b;
+    --c-950: #022c22;
+    --logo-filter: hue-rotate(0deg);
+}
+
+/* 深海谧 (Deep Sea) - Blue */
+:root[data-theme="blue"] {
+    --c-50: #eff6ff;
+    --c-100: #dbeafe;
+    --c-200: #bfdbfe;
+    --c-300: #93c5fd;
+    --c-400: #60a5fa;
+    --c-500: #3b82f6;
+    --c-600: #2563eb;
+    --c-700: #1d4ed8;
+    --c-800: #1e40af;
+    --c-900: #1e3a8a;
+    --c-950: #172554;
+    --logo-filter: hue-rotate(60deg);
+}
+
+/* 暖阳愿 (Warm Sun) - Amber/Orange Mix */
+:root[data-theme="amber"] {
+    --c-50: #fffbeb;
+    --c-100: #fef3c7;
+    --c-200: #fde68a;
+    --c-300: #fcd34d;
+    --c-400: #fbbf24;
+    --c-500: #f59e0b;
+    --c-600: #d97706;
+    --c-700: #b45309;
+    --c-800: #92400e;
+    --c-900: #78350f;
+    --c-950: #451a03;
+    --logo-filter: hue-rotate(-115deg);
+}
+
+/* 紫微星 (Nebula) - Violet */
+:root[data-theme="violet"] {
+    --c-50: #f5f3ff;
+    --c-100: #ede9fe;
+    --c-200: #ddd6fe;
+    --c-300: #c4b5fd;
+    --c-400: #a78bfa;
+    --c-500: #8b5cf6;
+    --c-600: #7c3aed;
+    --c-700: #6d28d9;
+    --c-800: #5b21b6;
+    --c-900: #4c1d95;
+    --c-950: #2e1065;
+    --logo-filter: hue-rotate(110deg);
+}
+
+/* 绯红月 (Crimson) - Rose */
+:root[data-theme="rose"] {
+    --c-50: #fff1f2;
+    --c-100: #ffe4e6;
+    --c-200: #fecdd3;
+    --c-300: #fda4af;
+    --c-400: #fb7185;
+    --c-500: #f43f5e;
+    --c-600: #e11d48;
+    --c-700: #be123c;
+    --c-800: #9f1239;
+    --c-900: #881337;
+    --c-950: #4c0519;
+    --logo-filter: hue-rotate(190deg);
+}
+
+/* Utilities for transition */
+.transition-colors {
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 300ms;
+}
+
+/* Apply transition to common elements that will change color */
+body,
+button,
+input,
+.active-tab,
+i {
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Dynamic Logo Filtering - Applies to placeholder SVG or when transitioning to real image */
+.dynamic-logo[src*="logo.svg"],
+.dynamic-logo.is-placeholder {
+    filter: var(--logo-filter, none);
+    transition: filter 0.3s ease;
+}
+
+/* Theme Utilities to replace hardcoded Tailwind classes */
+.t-bg-main {
+    background-color: var(--bg-main) !important;
+}
+
+.t-bg-panel {
+    background-color: var(--bg-panel) !important;
+}
+
+.t-bg-item-hover:hover {
+    background-color: var(--bg-item-hover) !important;
+}
+
+.t-bg-header {
+    background-color: var(--bg-header) !important;
+}
+
+.t-bg-glass {
+    background-color: var(--bg-glass) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.t-text-main {
+    color: var(--text-main) !important;
+}
+
+.t-text-muted {
+    color: var(--text-muted) !important;
+}
+
+.t-text-dim {
+    color: var(--text-dim) !important;
+}
+
+.t-border-main {
+    border-color: var(--border-main) !important;
+}
+
+.t-border-dim {
+    border-color: var(--border-dim) !important;
+}
+
+.t-shadow {
+    box-shadow: var(--shadow-main) !important;
+}
+
+/* Global overrides for dark mode compatibility */
+[data-appearance='dark'] ::-webkit-scrollbar-track {
+    background: #1f2937;
+}
+
+[data-appearance='dark'] ::-webkit-scrollbar-thumb {
+    background: #4b5563;
+}
+
+[data-appearance='dark'] ::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+}
+
+/* 强制适配文本类输入元素 (支持模式切换与自动跟随系统) */
+:root[data-appearance="dark"] input:not([type="range"], [type="checkbox"], [type="radio"], [type="button"], [type="submit"]),
+:root[data-appearance="dark"] select,
+:root[data-appearance="dark"] textarea {
+    background-color: var(--bg-panel) !important;
+    color: var(--text-main) !important;
+    border-color: var(--border-main) !important;
+}
+
+@media (prefers-color-scheme: dark) {
+
+    :root:not([data-appearance="light"]) input:not([type="range"], [type="checkbox"], [type="radio"], [type="button"], [type="submit"]),
+    :root:not([data-appearance="light"]) select,
+    :root:not([data-appearance="light"]) textarea {
+        background-color: var(--bg-panel) !important;
+        color: var(--text-main) !important;
+        border-color: var(--border-main) !important;
+    }
+}
+
+
+
+/* Tracking utility for switches/sliders if needed as a helper */
+.t-bg-track {
+    background-color: var(--bg-item-hover) !important;
+}
+
+/* Brand Badges (using base variables where possible) */
+.t-badge-blue {
+    background-color: #dbeafe;
+    color: #1d4ed8;
+}
+
+.t-badge-yellow {
+    background-color: #fef3c7;
+    color: #b45309;
+}
+
+.t-badge-green {
+    background-color: #d1fae5;
+    color: #047857;
+}
+
+.t-badge-red {
+    background-color: #ffe4e6;
+    color: #be123c;
+}
+
+.t-badge-pink {
+    background-color: #fce7f3;
+    color: #be185d;
+}
+
+.t-badge-gray {
+    background-color: #f3f4f6;
+    color: #4b5563;
+}
+
+[data-appearance="dark"] .t-badge-blue {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+[data-appearance="dark"] .t-badge-yellow {
+    background-color: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+[data-appearance="dark"] .t-badge-green {
+    background-color: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+[data-appearance="dark"] .t-badge-red {
+    background-color: rgba(244, 63, 94, 0.2);
+    color: #fb7185;
+    border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+[data-appearance="dark"] .t-badge-pink {
+    background-color: rgba(236, 72, 153, 0.2);
+    color: #f472b6;
+    border: 1px solid rgba(236, 72, 153, 0.3);
+}
+
+[data-appearance="dark"] .t-badge-gray {
+    background-color: rgba(156, 163, 175, 0.2);
+    color: #9ca3af;
+    border: 1px solid rgba(156, 163, 175, 0.3);
+}
