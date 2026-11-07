@@ -1,0 +1,98 @@
+:root { color-scheme: light; --paper:#f3f6f7; --panel:#ffffff; --ink:#20343c; --muted:#607780; --accent:#176b68; --line:#dce5e8; --wash:#e5eff0; --reading:#fbfcfa; --font-size:21px; --line-height:1.95; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--paper); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+body[data-theme="night"] { color-scheme:dark; --paper:#18262e; --panel:#20323b; --ink:#d8e2e7; --muted:#9bb0ba; --accent:#8dc9bd; --line:#354c58; --wash:#2a424b; --reading:#1c2c34; }
+body[data-theme="warm"] { --paper:#eae4d6; --panel:#f7f0df; --ink:#423c30; --muted:#776e5a; --accent:#586d4c; --line:#d6ccb7; --wash:#e5dec9; --reading:#f3eddf; }
+a { color:inherit; text-decoration:none; }
+button,input,select { font:inherit; }
+button,select { cursor:pointer; }
+button { padding:10px 16px; border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--ink); }
+button:hover { border-color:var(--accent); }
+button.primary { background:var(--accent); color:var(--panel); border-color:var(--accent); }
+button:disabled { opacity:.45; cursor:default; }
+:focus-visible { outline:3px solid var(--accent); outline-offset:4px; }
+[hidden] { display:none !important; }
+input,select { min-width:0; border:1px solid var(--line); border-radius:8px; padding:11px 14px; color:var(--ink); background:var(--panel); }
+.app-header { max-width:1200px; margin:auto; padding:24px 32px; display:flex; align-items:center; gap:44px; padding-top:max(24px,env(safe-area-inset-top)); }
+.brand { display:flex; gap:12px; align-items:center; white-space:nowrap; font-size:23px; font-weight:650; }
+.brand-mark { background:var(--accent); color:var(--panel); width:42px; height:48px; display:grid; place-items:center; border-radius:5px 11px 11px 5px; font-family:"Songti SC","SimSun",serif; font-size:29px; box-shadow:inset 4px 0 0 #ffffff28; }
+.brand small { display:block; font-size:11px; font-weight:400; color:var(--muted); margin-top:2px; letter-spacing:3px; }
+nav { display:flex; gap:24px; white-space:nowrap; }
+nav a { padding:10px 0; color:var(--muted); border-bottom:2px solid transparent; }
+nav a[aria-current="page"] { color:var(--accent); border-color:var(--accent); }
+#search-form { display:flex; gap:8px; margin-left:auto; }
+#keyword { width:220px; background:var(--panel); }
+#view { max-width:1200px; margin:auto; padding:20px 32px max(48px,env(safe-area-inset-bottom)); }
+.intro-row { display:flex; justify-content:space-between; align-items:flex-end; margin:20px 0 30px; gap:24px; }
+h1,h2,h3,p { margin-top:0; }
+h1 { font-family:"Songti SC","Noto Serif CJK SC","SimSun",serif; font-size:38px; font-weight:600; line-height:1.4; margin-bottom:10px; }
+h2 { font-size:21px; font-weight:600; }
+.subtext,.meta { color:var(--muted); font-size:14px; line-height:1.8; }
+.subtext { margin-bottom:0; }
+.categories { display:flex; flex-wrap:wrap; gap:8px; padding:0 0 26px; }
+.categories button { border-radius:20px; padding:8px 17px; background:transparent; }
+.categories button[aria-pressed="true"] { background:var(--accent); color:var(--panel); border-color:var(--accent); }
+.section-title { display:flex; justify-content:space-between; align-items:center; margin:0 0 10px; }
+.section-title span { color:var(--muted); font-size:13px; }
+.book-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0 30px; }
+.book-card { display:flex; align-items:center; gap:18px; padding:23px 0; border-bottom:1px solid var(--line); min-width:0; }
+.cover { flex:0 0 85px; height:116px; background:#d9e5e4; color:#28524f; border-radius:3px 7px 7px 3px; overflow:hidden; box-shadow:inset 4px 0 #28524f28,2px 3px 6px #17323813; display:grid; place-items:center; position:relative; }
+.cover span { padding:12px 13px; text-align:center; font:600 17px/1.7 "Songti SC","SimSun",serif; word-break:break-all; }
+.cover img { width:100%; height:100%; object-fit:cover; position:absolute; inset:0; }
+.book-card:nth-child(3n+2) .cover { background:#dae2ec; color:#304869; }
+.book-card:nth-child(3n) .cover { background:#e6e3d9; color:#5d553d; }
+.book-info { min-width:0; }
+.book-info h3 { font-size:17px; line-height:1.65; margin-bottom:8px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.book-info p { margin-bottom:4px; font-size:12px; color:var(--muted); }
+.book-info .remark { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.6; }
+.pager { display:flex; align-items:center; justify-content:center; gap:16px; padding-top:30px; color:var(--muted); font-size:14px; }
+.empty,.status { text-align:center; padding:65px 20px; color:var(--muted); line-height:1.8; }
+.empty h2 { color:var(--ink); }
+.error-box { background:var(--panel); padding:30px; border:1px solid var(--line); border-radius:12px; margin:35px auto; max-width:600px; }
+.error-box p { color:var(--muted); line-height:1.8; overflow-wrap:anywhere; }
+.back-link { display:inline-block; color:var(--muted); font-size:14px; margin:8px 0 28px; }
+.book-detail { display:flex; gap:32px; align-items:flex-start; margin-bottom:30px; }
+.book-detail .cover { flex-basis:145px; height:200px; }
+.book-detail .cover span { font-size:26px; }
+.detail-text { flex:1; min-width:0; }
+.detail-text h1 { font-size:32px; }
+.description { max-width:760px; font-size:15px; line-height:1.95; white-space:pre-line; color:var(--muted); margin-top:20px; }
+.actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:22px; }
+.catalog { padding:28px; background:var(--panel); border:1px solid var(--line); border-radius:12px; }
+.catalog-tools { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:18px; }
+.catalog-tools h2 { margin:0 auto 0 0; }
+.chapter-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0 20px; }
+.chapter-link { padding:13px 4px; font-size:14px; border-bottom:1px solid var(--line); line-height:1.6; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.chapter-link.current { color:var(--accent); font-weight:600; }
+.shelf-card { position:relative; padding-bottom:48px; }
+.shelf-card .remove-book { position:absolute; right:0; bottom:13px; padding:4px 10px; font-size:12px; }
+.continue-note { color:var(--accent); font-size:12px; margin-top:8px; }
+.resume-banner { display:flex; align-items:center; justify-content:space-between; padding:18px 22px; margin-bottom:25px; background:var(--wash); border-radius:10px; gap:16px; }
+.resume-banner p { margin:0; line-height:1.7; }
+.resume-banner small { display:block; color:var(--muted); }
+body.reading .app-header { display:none; }
+body.reading #view { max-width:none; padding:0; }
+.reader { background:var(--reading); min-height:100vh; }
+.reader-bar { position:sticky; top:0; z-index:5; background:var(--reading); border-bottom:1px solid var(--line); padding:max(13px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) 13px max(20px,env(safe-area-inset-left)); display:flex; align-items:center; gap:18px; }
+.reader-bar .book-label { flex:1; color:var(--muted); font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.reader-bar button { padding:7px 12px; background:transparent; }
+.reading-progress { height:2px; background:var(--wash); position:sticky; top:69px; z-index:6; }
+.reading-progress span { display:block; height:100%; background:var(--accent); width:0; }
+.reader-content { max-width:780px; margin:auto; padding:50px 42px 40px; }
+.reader-content h1 { font-size:29px; text-align:center; margin-bottom:36px; }
+.chapter-body { font-family:"Songti SC","Noto Serif CJK SC","SimSun",serif; font-size:var(--font-size); line-height:var(--line-height); overflow-wrap:anywhere; }
+.chapter-body p { margin:0 0 1em; text-indent:2em; }
+.chapter-bottom { padding:30px 0; display:flex; align-items:center; justify-content:center; gap:18px; }
+.chapter-bottom span { color:var(--muted); font-size:13px; }
+.reader-note { text-align:center; color:var(--muted); font-size:13px; padding-bottom:max(24px,env(safe-area-inset-bottom)); }
+.settings { position:fixed; right:20px; top:80px; z-index:10; padding:24px; width:min(340px,calc(100vw - 40px)); border:1px solid var(--line); background:var(--panel); box-shadow:0 10px 40px #172d3b22; border-radius:12px; }
+.settings label { display:flex; align-items:center; justify-content:space-between; gap:15px; margin-bottom:18px; }
+.settings input { width:130px; accent-color:var(--accent); }
+.theme-buttons { display:flex; gap:8px; }
+.theme-buttons button { flex:1; padding:8px; }
+.theme-buttons [aria-pressed="true"] { border:2px solid var(--accent); }
+.demo-note { padding:10px 20px; background:var(--wash); color:var(--accent); margin:0; text-align:center; font-size:13px; }
+@media (prefers-color-scheme:dark) { body:not([data-theme]) { color-scheme:dark; --paper:#18262e; --panel:#20323b; --ink:#d8e2e7; --muted:#9bb0ba; --accent:#8dc9bd; --line:#354c58; --wash:#2a424b; --reading:#1c2c34; } }
+@media (max-width:900px) { .app-header { gap:24px; padding-left:24px; padding-right:24px; flex-wrap:wrap; } #search-form { flex:1; } #keyword { flex:1; width:150px; } #view { padding-left:24px; padding-right:24px; } .book-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .chapter-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:560px) { .app-header { gap:18px; padding:20px; padding-top:max(20px,env(safe-area-inset-top)); } .brand { font-size:21px; } nav { margin-left:auto; gap:18px; font-size:14px; } #search-form { flex-basis:100%; } #view { padding:12px 20px 40px; } h1 { font-size:29px; } .intro-row { margin:20px 0 24px; } .intro-row .subtext { font-size:13px; } .book-grid { grid-template-columns:1fr; gap:0; } .book-card { padding:17px 0; } .cover { flex-basis:76px; height:104px; } .book-info h3 { -webkit-line-clamp:2; font-size:18px; } .book-info p { font-size:13px; } .book-detail { gap:20px; } .book-detail .cover { flex-basis:96px; height:137px; } .detail-text h1 { font-size:24px; } .book-detail .cover span { font-size:19px; } .catalog { padding:18px; } .catalog-tools input { width:100%; } .chapter-grid { grid-template-columns:1fr; } .reader-content { padding:32px 22px 20px; } .reader-content h1 { font-size:25px; } .reader-bar { gap:10px; } .reader-bar .book-label { font-size:12px; } .reader-bar button { padding:7px 8px; font-size:13px; } .chapter-bottom { gap:10px; } .chapter-bottom button { padding:10px 12px; } .resume-banner { padding:16px; } }
+@media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto !important; } }

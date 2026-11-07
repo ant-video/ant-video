@@ -66,8 +66,8 @@
         (info.devMode ? ' · 调试模式' : '');
       if (info.isTV) document.body.classList.add('tv');
     })
-    .catch(function () {
-      /* 拿不到环境信息不影响主流程 */
+    .catch(function (error) {
+      console.warn('读取宿主环境失败', error);
     });
 
   ant.onHide(function () {

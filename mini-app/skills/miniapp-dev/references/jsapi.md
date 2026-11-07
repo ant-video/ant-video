@@ -1,17 +1,19 @@
-# ant JSAPI 参考（SDK v4）
+# ant JSAPI 参考（当前 SDK v6）
 
 本文件是 skill 自带的完整参考，**不依赖宿主仓库**。在宿主仓库里工作时可以额外读
 `docs/miniapp/` 下的三篇文档（更细，含技术设计与实战示例），行为有疑问时以宿主的
 `assets/miniapp/ant-sdk.js` 与 `lib/miniapp/bridge/` 为准。
 
-`ant.version` / `getSystemInfo().sdkVersion` 现在是 `4`。老宿主上新增的东西是
-`undefined` 或被忽略，要兼容就先判一下版本：
+当前 `ant.version` 是 6，宿主 `getSystemInfo().sdkVersion` 仍为 5；优先检查具体方法是否存在。
+老宿主上新增方法可能是 undefined 或返回 UNKNOWN_API。Python 后端详细说明见
+[python.md](python.md)，需要时再读。
 
 | 版本 | 新增 |
 |---|---|
 | v2 | `ant.request` 的 `responseType` / `followRedirects`、`ant.requestBytes`、`ant.base64ToBytes`、`ant.serve` 与 `service` 权限 |
 | v3 | `ant.miniApp.open` / `getLaunchOptions` / `onOpen` 与 `miniapp` 权限 |
 | v4 | `ant.player.open` 收 `sniff` 与 `source.play` 的解析字段：`parse`/`jx` 为 `'1'` 的线路能交给宿主嗅探 |
+| 当前版本 | `ant.python.call`、python 服务块、`ant.file` 与 filesystem 权限、`ant.requestStream/requestSSE/readLines`、`ant.resolveService` |
 
 ## manifest.json
 
@@ -28,7 +30,8 @@
 | `permissions` | | 见下表。**没声明的能力一律调不通** |
 | `node` | | 包内 Node.js 服务：`{"entry": "server/index.js", "config": "server/index.config.js"}`（`config` 可选，缺省找 entry 同目录的 `index.config.js`，都没有则 `start(null)`）。声明了就必须有 `node` 权限，入口/配置文件必须存在于包内；宿主以 worker 运行 `entry`（需导出 `start(config)`，监听 `process.env.DEV_HTTP_PORT`），可带 `node_modules`（上限 200MB / 10000 文件），寻址同样用 `miniapp://<appId>`。见开发引导 §4.11 |
 | `network.allowlist` | | 两个用途：`ant.request` 能访问哪些域名（**不写等于不限制**）；WebView 能跳到哪些域名（**不写等于只能同源**，且导航不认 `*`，在线站点的登录域 / CDN 必须逐条写） |
-| `icon` | | 图标的**网络地址**（http/https）。不写、写包内相对路径或图挂了，都退回名称首字 |
+| `python` | | `{"entry":"app.py"}`，必须有 python 权限且入口在包内，与 node 块互斥。顶层函数用于 ant.python.call；HTTP 服务导出 serve(request) 或 Flask/WSGI app，宿主负责加载/端口。后端包上限 200MB / 10000 文件 |
+| `icon` | | http/https 图标或包内相对路径，缺失/加载失败时回退名称首字 |
 | `description` | | 一句话描述 |
 | `minHostVersion` | | 最低宿主版本，低于它安装被拒（`HOST_TOO_OLD`） |
 | `pages` | | 二期原生渲染用，现在写了不生效 |
@@ -48,7 +51,10 @@
 |---|---|
 | `ui` | `ant.ui.*`、`ant.clipboard.*` |
 | `storage` | `ant.storage.*` |
-| `network` | `ant.request`、`ant.requestJson`、`ant.requestBytes` |
+| `filesystem` | `ant.file.*` |
+| `network` | `ant.request`、`ant.requestJson`、`ant.requestBytes`、`ant.requestStream`、`ant.requestSSE` |
+| `miniapp` | `ant.miniApp.open`、`ant.resolveService`（接收启动参数不需权限） |
+| `python` | `ant.python.call` 与 manifest.python 本地后端 |
 | `navigate` | `ant.navigateTo` / `redirectTo` / `navigateBack` / `exitMiniApp` |
 | `player` | `ant.player.*` |
 | `source` | `ant.source.*` |
@@ -66,7 +72,7 @@
 
 ## API
 
-所有方法返回 Promise。失败时 reject 的 Error 带 `code` 与 `api` 字段。宿主在 document-start
+异步 JSAPI 返回 Promise；事件注册、readLines、base64 转换等同步工具不返回 Promise。失败时 reject 的 Error 带 `code` 与 `api` 字段。宿主在 document-start
 注入 `window.ant`，**不要自己引 `ant-sdk.js`**。
 
 ### 环境与日志
@@ -89,7 +95,7 @@ const res = await ant.request({
   method: 'GET',          // GET/POST/PUT/DELETE/HEAD/PATCH
   headers: { 'User-Agent': 'my-app' },
   data: { page: 1 },      // POST 等方法的 body
-  timeout: 8000,          // ms，缺省 15000，夹在 1000~30000
+  timeout: 8000,          // ms，缺省 15000，当前接收上限 600000
   responseType: 'text',   // 'text'（缺省）| 'base64'
   followRedirects: true   // false 时自己读 302 的 Location
 });
@@ -100,7 +106,8 @@ const json = await ant.requestJson({ url: '...' });   // 非 2xx 或非法 JSON 
 ```
 
 走宿主的 Dio，**不受浏览器 CORS 限制**——这是相对纯 H5 的最大优势。
-限制：只允许 http/https；回环与内网地址一律 `FORBIDDEN_HOST`；响应体上限 10MB；
+限制：外网只允许 http/https；直接指定的回环与内网地址 `FORBIDDEN_HOST`；宿主解析的
+`miniapp://<appId>/path` 服务及其注册端点可请求（不要猜端口/token/key）；响应体上限 10MB；
 `host`、`content-length`、`connection` 三个请求头会被忽略。
 
 **二进制响应**用 `responseType: 'base64'`，`data` 变成 base64 串（`byteLength` 是原始
@@ -115,6 +122,39 @@ const same = ant.base64ToBytes(res.data);               // 手工转换
 `window.fetch` 是浏览器原生的，**受 CORS 限制**，跨域取数据一律用 `ant.request`。
 需要让第三方库无缝走宿主网络时，可以把 `globalThis.fetch` 换成一层基于
 `ant.request` 的包装（`ant.serve` 那一节有完整例子的出处）。
+
+### 流式请求、SSE 和服务地址
+
+```js
+const stream = await ant.requestStream({
+  url:'https://api.example.com/events', timeout:600000,
+  onHeaders(info) { /* {id,kind,statusCode,headers,url} */ },
+  onData(text) { /* UTF-8 增量文本 */ },
+  onError(error) { /* 异步流错误 */ },
+  onDone() { /* 流已结束 */ }, onAbort() { /* 已取消 */ }
+}); // {id, statusCode, abort}，拿到句柄不等于流结束
+await stream.abort();
+await ant.requestSSE({url:'miniapp://com.example.python/events'}, dataLine => console.log(dataLine));
+const feed = ant.readLines(line => console.log(line)); // 返回喂文本块的函数，未结束的行留在 buffer
+const url = await ant.resolveService('miniapp://com.example.python/path'); // [miniapp]，返回真实 http URL
+```
+
+network 权限覆盖流请求；readLines 不需权限。requestSSE 仅识别每行 data 字段，
+不解析完整 SSE event/id/retry 语义。底层通知事件为 request.stream。
+onError/onDone/onAbort 收尾，离开页面时按需取消；不要用 await 句柄判断业务已完成。
+普通 ant.request 与流请求当前 timeout 都夹在 1~600 秒；流 timeout 主要用于连接/响应头等待，
+不要把它当整体流时长或空闲超时保证。需应用级时限时自行计时 abort。
+解析后的实际服务地址仅供当次使用，重新启动后端口可能改变。
+
+### Python 函数
+
+```js
+const result = await ant.python.call('hello', {name:'读者'}, 2); // [python]，JSON 位置参数
+```
+
+需要 manifest.python.entry；调用入口文件的顶层函数，直接返回其 JSON 值。
+不直接调用 Spider 的类方法；不要传 dotted 函数名。函数调用/HTTP/WSGI/依赖/平台及小说移植
+见 [python.md](python.md)。
 
 ### 存储
 
@@ -131,6 +171,27 @@ const keys = await ant.storage.keys();
 ```
 
 `localStorage` 也能用，但每次启动小程序的 origin 端口都不同，**不保证跨启动保留**。
+
+### 私有文件
+
+需要 filesystem 权限，按 appId 隔离，升级保留，卸载清除；这是宿主 data/files，不是包内目录。
+总配额 20MB、单文件 5MB、条目上限 2000、路径上限 512 字符；路径必须是私有目录内相对路径。
+
+```js
+await ant.file.write('notes/chapter.txt', '正文'); // 自动创建父目录，返回 stat
+await ant.file.write('notes/chapter.txt', '\n后续正文', {append:true});
+const text = await ant.file.read('notes/chapter.txt'); // 直接字符串
+await ant.file.write('images/cover.bin', base64, {encoding:'base64'});
+const data = await ant.file.read('images/cover.bin', {encoding:'base64'});
+const info = await ant.file.stat('notes/chapter.txt'); // {path,type:'file'|'directory',size,modifiedAt}
+const entries = await ant.file.list('notes'); // 同级条目数组，不递归；list('') 列根目录
+await ant.file.mkdir('notes/archive');
+await ant.file.rename('notes/chapter.txt', 'notes/archive/chapter.txt', {overwrite:false});
+await ant.file.delete('notes/archive', {recursive:true});
+```
+
+当前配额检查较保守：覆盖文件也先按“已用空间 + 新内容”检查，追加后单文件可能超过读上限。
+让缓存保持在上限以下，必要时先删除旧缓存再写；不要把大正文塞进 5MB 键值存储。
 
 ### 界面与剪贴板
 
@@ -399,6 +460,10 @@ try { await ant.request({ url: '...' }); } catch (e) { console.log(e.code, e.mes
 | `REQUEST_FAILED` | 网络层失败（超时、DNS、连接） | 重试或检查地址 |
 | `RESPONSE_TOO_LARGE` | 响应超过 10MB | 分页拉取 |
 | `QUOTA_EXCEEDED` | `ant.storage` 超 5MB | 清理旧数据 |
+| `INVALID_PATH` / `NOT_FOUND` / `FILE_TOO_LARGE` | 私有文件路径非法、不存在或大于 5MB | 使用相对路径、检查存在并分批存文件 |
+| `ALREADY_EXISTS` | 文件重命名目标存在 | 显式 overwrite 或先清理；删除非空目录时明确 recursive |
+| `PYTHON_ENTRY_MISSING` / `PYTHON_RUNTIME_UNAVAILABLE` / `PYTHON_CALL_FAILED` | Python 声明、运行时或调用失败 | 见 python.md |
+| `SERVICE_UNAVAILABLE` | miniapp 服务未安装或无法加载 | 核对 service/node/python 与入口 |
 | `INVALID_KEY` | storage key 为空或超 256 字符 | — |
 | `CROSS_ORIGIN` | 想跳到小程序之外的地址 | 把域名写进 `network.allowlist`，或用 `<a target="_blank">` 让用户确认后走浏览器 |
 | `UNAVAILABLE` | 宿主对应模块未就绪 | 降级处理 |
@@ -416,13 +481,15 @@ try { await ant.request({ url: '...' }); } catch (e) { console.log(e.code, e.mes
 | 项 | 限制 |
 |---|---|
 | 请求 | 只允许 http/https；回环与内网（`localhost`、`127.x`、`10.x`、`172.16-31.x`、`192.168.x`、`169.254.x`、`fc00::/7`、`fe80::/10`）一律拒绝 |
-| 请求超时 | 缺省 15s，夹在 1~30s |
+| 请求超时 | 缺省 15s，当前普通/流请求参数上限 600s；流不保证整体/空闲时限 |
 | 响应体 | ≤10MB |
 | 被忽略的请求头 | `host`、`content-length`、`connection` |
 | storage | 配额 5MB，key ≤256 字符，按 appId 隔离 |
+| file | 配额 20MB，单文件 5MB、条目 2000、路径 ≤512 字符 |
 | 采集源 | 单次 60s 超时，并发上限 3 |
 | 反向服务 | 单次 60s 超时，请求体 ≤1MB；同时保活的实例总数 3 个 |
 | 包体 | 单文件 ≤20MB，解压后 ≤100MB，文件数 ≤2000，不能有符号链接 |
+| Node / Python 后端包 | 单文件 ≤20MB，解压后 ≤200MB，文件数 ≤10000，不能有符号链接 |
 
 ## 分发（市场 JSON）
 
@@ -456,6 +523,10 @@ zip 传到任何能直链下载的地方，再给一个 JSON 列表地址，用�
 | 域名白名单 | 不检查 | 检查 `network.allowlist` |
 | 权限门禁 | 只在配了 `__antMockPermissions` 时检查 | 始终按 manifest 检查 |
 | `ant.storage` | `localStorage` | 文件，5MB 配额 |
+| `ant.file` | 独立 localStorage 模拟文件，仅验证交互 | 宿主私有文件目录、路径/配额校验 |
+| `ant.python.call` | __antMockPython 假函数，或 dev_python.py 转发本机 Python | 包内入口 + 内嵌 CPython；dev server 调试不加载后端 |
+| `ant.requestStream/requestSSE` | fetch + ReadableStream，受 CORS 限制 | 宿主消费流，增量通过 request.stream 事件推回 |
+| `ant.resolveService` | __antMockServices 映射 | 自动加载已安装服务并返回注册端点 |
 | `ant.player.open` | 页面内 `<video>` | 宿主全屏播放页（含 M3U8 代理与去广告） |
 | `ant.player.open` 的 `headers` | 发不出去（只警告） | 带到内核与代理 |
 | `ant.source.*` | `__antMockFixtures` 假数据 | 真站点，慢且可能失败 |

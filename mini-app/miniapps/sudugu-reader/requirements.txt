@@ -1,0 +1,4 @@
+# 本地联调依赖；宿主已有这些包，不会自动 pip install。
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+flask>=3.0.0

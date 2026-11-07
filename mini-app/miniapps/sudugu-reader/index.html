@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>速读谷小说</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header class="app-header">
+    <a class="brand" href="#home" aria-label="速读谷小说首页"><span class="brand-mark">读</span><span>速读谷<small>小说阅读</small></span></a>
+    <nav aria-label="主导航"><a href="#home" data-tab="home">书城</a><a href="#shelf" data-tab="shelf">我的书架</a></nav>
+    <form id="search-form" role="search"><input id="keyword" type="search" maxlength="80" placeholder="搜索书名或作者" aria-label="书名或作者"><button type="submit">搜索</button></form>
+  </header>
+  <p id="demo-note" class="demo-note" hidden>当前展示示例内容，仅用于界面预览。</p>
+  <main id="view" aria-live="polite" aria-busy="true"><p class="status">正在打开书城…</p></main>
+  <script>
+    window.__antMockAppId = 'com.leospring.sudugu_reader';
+    window.__antMockPermissions = ['python', 'storage', 'ui'];
+    window.__antMockPython = async function (method, args) {
+      if (new URLSearchParams(location.search).get('demo') === '1') return window.readerFixtures(method, args);
+      const response = await fetch('./__python/' + encodeURIComponent(method), {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({args: args})
+      });
+      if (!response.ok) throw new Error('阅读服务未就绪，请检查服务后重试');
+      return response.json();
+    };
+  </script>
+  <script src="./ant-mock.js"></script>
+  <script src="./preview.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

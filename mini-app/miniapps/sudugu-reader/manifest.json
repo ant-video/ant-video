@@ -1,0 +1,11 @@
+{
+  "appId": "com.leospring.sudugu_reader",
+  "name": "速读谷小说",
+  "version": "1.0.0",
+  "versionCode": 1,
+  "renderer": "webview",
+  "entry": "index.html",
+  "description": "基于速读谷 Python 采集脚本的小说阅读器，支持书城、搜索、目录、书架和阅读进度",
+  "permissions": ["python", "storage", "ui"],
+  "python": {"entry": "app.py"}
+}

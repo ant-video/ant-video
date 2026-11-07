@@ -6,5 +6,5 @@
   "renderer": "webview",
   "entry": "index.html",
   "description": "__DESCRIPTION__",
-  "permissions": __PERMISSIONS____NODE_BLOCK__
+  "permissions": __PERMISSIONS__
 }

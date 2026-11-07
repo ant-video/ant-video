@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>__NAME__</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="./style.css" />
   <!--
     以下两段只在浏览器里生效：宿主会在 document-start 注入真 SDK，
     ant-mock.js 检测到就自动退让，所以留在包里无害。
@@ -13,10 +13,9 @@
     window.__antMockPermissions = __PERMISSIONS_JS__;  // 必须与 manifest.permissions 一致
     window.__antMockAppId = '__APP_ID__';
     window.__antMockTV = false;                        // 想验证 TV 焦点逻辑时改 true
-    window.__antMockLaunchOptions = null;              // 模拟被其它小程序打开时填对象
     window.__antMockFixtures = {};                     // ant.source.* 的假数据
   </script>
-  <script src="ant-mock.js"></script>
+  <script src="./ant-mock.js"></script>
 </head>
 <body>
   <header class="bar">
@@ -34,6 +33,6 @@
     </section>
   </main>
 
-  <script src="app.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>

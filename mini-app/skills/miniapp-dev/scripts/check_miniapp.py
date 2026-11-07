@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """小程序包预检。
 
-覆盖宿主安装器的全部校验（manifest 合法性、入口存在、符号链接、体积与文件数上限），
+核对宿主安装规则（manifest、Python/Node 后端、入口、符号链接、体积与文件数上限），
 外加几项只有装到真机才会暴露的问题：权限漏声明、绝对路径引用、body 背景缺失、
 TV 按键缺失。ERROR 必须清零再进宿主。
 
@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 from urllib.parse import urlsplit
 
-SKIPPED_DIRS = {".git", ".svn", "node_modules", "__MACOSX", ".idea", ".vscode"}
+SKIPPED_DIRS = {".git", ".svn", "node_modules", "__MACOSX", ".idea", ".vscode", "__pycache__", ".venv", "venv"}
 SCAN_EXT = {".html", ".htm", ".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".vue", ".svelte"}
 # 这两个文件本身就在定义 / 模拟 ant.*，扫权限时要跳过，否则全是假阳性。
 SDK_FILES = {"ant-mock.js", "ant-sdk.js"}
@@ -33,6 +33,7 @@ APP_ID_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$")
 KNOWN_PERMS = [
     "network",
     "storage",
+    "filesystem",
     "ui",
     "navigate",
     "miniapp",
@@ -40,6 +41,7 @@ KNOWN_PERMS = [
     "source",
     "service",
     "node",
+    "python",
 ]
 
 # ant.<第一段> → 需要的权限。不在表里的第一段不需要权限。
@@ -47,7 +49,12 @@ PERM_OF = {
     "request": "network",
     "requestJson": "network",
     "requestBytes": "network",
+    "requestStream": "network",
+    "requestSSE": "network",
+    "resolveService": "miniapp",
     "storage": "storage",
+    "file": "filesystem",
+    "python": "python",
     "ui": "ui",
     "clipboard": "ui",
     "navigateTo": "navigate",
@@ -136,7 +143,7 @@ def collect(root, report, keep_node_modules=False):
         for name in filenames:
             full = Path(dirpath) / name
             rel = str(full.relative_to(root))
-            if name == ".DS_Store":
+            if name == ".DS_Store" or full.suffix in {".pyc", ".pyo"}:
                 skipped.append(rel)
                 continue
             if full.is_symlink():
@@ -254,8 +261,11 @@ def check_manifest(root, report):
 
     entry = str(data.get("entry") or "index.html").strip()
     remote_entry = check_remote_entry(entry, report)
-    if not remote_entry and not (root / entry).is_file():
-        report.error("ENTRY_MISSING", f"entry 指向的文件不存在：{entry}")
+    if not remote_entry:
+        if not _node_path_ok(entry):
+            report.error("UNSAFE_PATH", f"entry 必须是包内相对路径：{entry}")
+        elif not (root / entry).is_file():
+            report.error("ENTRY_MISSING", f"entry 指向的文件不存在：{entry}")
 
     perms = data.get("permissions", [])
     if not isinstance(perms, list):
@@ -294,9 +304,28 @@ def check_manifest(root, report):
             if "node" not in perms:
                 report.error("NODE_PERMISSION_MISSING", "声明了 node 块就必须声明 node 权限")
 
-    icon = str(data.get("icon", "")).strip()
+    raw_python = data.get("python")
+    python_entry = None
+    if raw_python is not None:
+        if not isinstance(raw_python, dict):
+            report.error("INVALID_PYTHON_BLOCK", f"python 必须是对象：{raw_python!r}")
+        else:
+            python_entry = str(raw_python.get("entry") or "").strip()
+            if not _node_path_ok(python_entry):
+                report.error("INVALID_PYTHON_ENTRY", f"python.entry 必须是非空包内相对路径：{python_entry}")
+            elif not (root / python_entry).is_file():
+                report.error("PYTHON_ENTRY_MISSING", f"python.entry 指向的文件不存在：{python_entry}")
+            if "python" not in perms:
+                report.error("PYTHON_PERMISSION_MISSING", "声明了 python 块就必须声明 python 权限")
+    if raw_node is not None and raw_python is not None:
+        report.error("SERVICE_RUNTIME_CONFLICT", "node 和 python 服务块不能同时声明")
+
+    icon = str(data.get("icon") or "").strip()
     if icon and not icon.startswith(("http://", "https://")):
-        report.warn("ICON_NOT_URL", f"icon 只认 http/https 网络地址，包内路径会退回名称首字：{icon}")
+        if not _node_path_ok(icon):
+            report.warn("INVALID_ICON", f"icon 必须是网络地址或包内相对路径：{icon}")
+        elif not (root / icon).is_file():
+            report.warn("ICON_MISSING", f"包内图标不存在，会回退到名称首字：{icon}")
 
     allowlist = []
     network = data.get("network")
@@ -313,6 +342,8 @@ def check_manifest(root, report):
         "permissions": [p for p in perms if p in KNOWN_PERMS],
         "allowlist": allowlist,
         "node_dir": node_dir,
+        "python_entry": python_entry,
+        "service_app": raw_node is not None or raw_python is not None,
     }
 
 
@@ -376,6 +407,8 @@ def scan(root, files, manifest, report):
         ext = full.suffix.lower()
         if ext != ".css" and ext not in SCAN_EXT:
             continue
+        if full.name in SDK_FILES:
+            continue  # SDK/mock 的实现与说明不属于应用调用，避免域名/权限假阳性
         try:
             raw = full.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -429,7 +462,8 @@ def scan(root, files, manifest, report):
         if perm not in declared and perm not in called:
             report.warn("MISSING_PERMISSION", f'{where} 引用了 "{perm}" 能力但没声明该权限')
     # node 是 manifest 级权限（node 块本身就是使用），没有对应的 ant.* 可反查
-    unused = declared - {"node"} - (set(called) | set(referenced))
+    runtime_perms = {"node"} | ({"python"} if manifest.get("python_entry") else set())
+    unused = declared - runtime_perms - (set(called) | set(referenced))
     for perm in sorted(unused):
         report.warn("UNUSED_PERMISSION", f'声明了 "{perm}" 但代码里没用到，按需申请')
     if uses_invoke:
@@ -452,6 +486,15 @@ def scan(root, files, manifest, report):
             "start(config) 里监听 process.env.DEV_HTTP_PORT；要宿主立刻感知监听状态就用 "
             "globalThis.catServerFactory；node_modules 会随包安装（上限 200MB / 10000 文件）。"
             "宿主按需自启（miniapp://<appId>），详情页可手动启停",
+        )
+    if "python" in declared:
+        if not manifest.get("python_entry") and "python" in (set(called) | set(referenced)):
+            report.error("PYTHON_ENTRY_MISSING", "ant.python.call 需要 manifest.python.entry，仅声明 python 权限不够")
+        report.note(
+            "声明了 python：入口顶层函数可由 ant.python.call(method, ...args) 调用；"
+            "HTTP 服务导出 serve(request) 或 Flask/WSGI app，不要 app.run()。"
+            "Python 代码使用宿主内嵌运行时，dev server 调试不会加载包内 Python；"
+            "本地可用 dev_python.py，最后导入 zip 验证（上限 200MB / 10000 文件）。",
         )
 
     for rel in dict.fromkeys(abs_refs):
@@ -506,8 +549,9 @@ def main(argv):
     # 先看 manifest：node 型小程序的 collect（node_modules 不跳）和上限都要按包型走
     manifest = check_manifest(root, report)
     node_app = bool(manifest and manifest.get("node_dir"))
+    service_app = bool(manifest and manifest.get("service_app"))
     files = collect(root, report, keep_node_modules=node_app)
-    check_limits(files, report, node_app=node_app)
+    check_limits(files, report, node_app=service_app)
     if manifest and manifest["remote_entry"]:
         # 页面代码在别人服务器上，静态检查无从下手，只能核 manifest 并点出人工项。
         report.note(f"在线站点型小程序，入口：{manifest['entry']}")

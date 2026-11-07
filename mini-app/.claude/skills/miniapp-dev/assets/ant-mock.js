@@ -8,8 +8,10 @@
  *   window.__antMockPermissions = ['ui','storage']   // 与 manifest.permissions 保持一致
  *   window.__antMockAppId       = 'com.foo.bar'
  *   window.__antMockTV          = false              // true 时 isTV 为真
- *   window.__antMockLaunchOptions = { sourceAppId:'com.foo.source', params:{} }
  *   window.__antMockFixtures    = { sites:[], search:{list:[]}, play:{url:''} }
+ *   window.__antMockPython      = { hello: function(payload) { return {message: payload.name}; } }
+ *                                // 或 function(method, args)，对接 dev_python.py
+ *   window.__antMockServices    = { 'com.foo.service': 'http://127.0.0.1:3001' }
  *
  * 浏览器里没有宿主，所以 `ant.serve` 注册的 handler 只是挂到 `window.__antServe`
  * 上，自己在 devtools 里调它验证：
@@ -22,8 +24,7 @@
   if (window.ant) return;                       // 真 SDK 已在，什么都不做
 
   var listeners = {};
-  var KEY_PREFIX = 'ant-mock:';
-  var miniAppLaunchOptions = window.__antMockLaunchOptions || null;
+  var KEY_PREFIX = 'ant-mock:' + (window.__antMockAppId || 'com.mock.app') + ':';
 
   function on(event, handler) {
     if (typeof handler !== 'function') return function () {};
@@ -42,7 +43,6 @@
     return dispose;
   }
   function emit(event, data) {
-    if (event === 'miniApp.open') miniAppLaunchOptions = data || null;
     (listeners[event] || []).slice().forEach(function (fn) {
       try { fn(data); } catch (e) { console.error('[ant-mock] ' + event, e); }
     });
@@ -63,6 +63,14 @@
     return fail('PERMISSION_DENIED', 'manifest 未声明 ' + permission + ' 权限（mock 检查）');
   }
 
+  function serviceUrl(url) {
+    if (!/^miniapp:\/\//.test(url || '')) return url;
+    var match = /^miniapp:\/\/([^/?]+)(.*)$/.exec(url);
+    var base = match && (window.__antMockServices || {})[match[1]];
+    if (!base) throw new Error('服务未配置，请设置 __antMockServices');
+    return base.replace(/\/$/, '') + match[2];
+  }
+
   /* ---- toast / loading 的极简 DOM 实现 ---- */
   function toastEl(text) {
     var el = document.createElement('div');
@@ -77,7 +85,7 @@
   var loadingEl = null;
 
   window.ant = {
-    version: 3,
+    version: 6,
     mock: true,
 
     invoke: function (api, params) {
@@ -98,7 +106,7 @@
           appVersionCode: 0,
           devMode: true,
           permissions: declared || [],
-          sdkVersion: 3,
+          sdkVersion: 6,
           mock: true
         });
       }
@@ -119,7 +127,7 @@
       if (o.data !== undefined && init.method !== 'GET' && init.method !== 'HEAD') {
         init.body = typeof o.data === 'string' ? o.data : JSON.stringify(o.data);
       }
-      return fetch(o.url, init).then(function (res) {
+      return Promise.resolve().then(function () { return fetch(serviceUrl(o.url), init); }).then(function (res) {
         var headers = {};
         res.headers.forEach(function (v, k) { headers[k] = [v]; });
         var body = wantsBytes
@@ -156,6 +164,77 @@
       return window.ant.request(o).then(function (res) {
         return window.ant.base64ToBytes(res.data);
       });
+    },
+    requestStream: function (options) {
+      var denied = need('network'); if (denied) return denied;
+      var opts = typeof options === 'string' ? {url: options} : options || {};
+      var controller = new AbortController();
+      var init = {method: opts.method || 'GET', headers: opts.headers, signal: controller.signal};
+      if (opts.data !== undefined && init.method !== 'GET' && init.method !== 'HEAD') {
+        init.body = JSON.stringify(opts.data);
+      }
+      return Promise.resolve().then(function () { return fetch(serviceUrl(opts.url), init); }).then(function (response) {
+        if (opts.onHeaders) opts.onHeaders({statusCode: response.status, url: response.url});
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        async function consume() {
+          try {
+            while (true) {
+              var result = await reader.read();
+              var text = decoder.decode(result.value, {stream: !result.done});
+              if (text && opts.onData) opts.onData(text);
+              if (result.done) break;
+            }
+            if (opts.onDone) opts.onDone();
+          } catch (error) {
+            if (controller.signal.aborted) { if (opts.onAbort) opts.onAbort(); }
+            else if (opts.onError) opts.onError(error);
+          } finally { reader.releaseLock(); }
+        }
+        consume();
+        return {id: 'mock_' + Date.now(), statusCode: response.status,
+          abort: function () { controller.abort(); return Promise.resolve(); }};
+      });
+    },
+    readLines: function (onLine) {
+      var buffer = '';
+      return function (chunk) {
+        buffer += String(chunk || '');
+        var lines = buffer.split(/\r?\n/); buffer = lines.pop();
+        lines.forEach(onLine);
+      };
+    },
+    requestSSE: function (options, onEvent) {
+      var previous = options.onData;
+      var feed = window.ant.readLines(function (line) {
+        if (line.indexOf('data:') === 0) onEvent(line.slice(5).replace(/^ /, ''));
+      });
+      return window.ant.requestStream(Object.assign({}, options, {
+        onData: function (chunk) { feed(chunk); if (previous) previous(chunk); }
+      }));
+    },
+    resolveService: function (url) {
+      var denied = need('miniapp'); if (denied) return denied;
+      var match = /^miniapp:\/\/([^/?]+)(.*)$/.exec(url);
+      if (!match) return fail('INVALID_URL', '只支持 miniapp://');
+      var base = (window.__antMockServices || {})[match[1]];
+      if (!base) return fail('SERVICE_UNAVAILABLE', '配置 __antMockServices 后再联调');
+      return Promise.resolve(base.replace(/\/$/, '') + match[2]);
+    },
+    python: {
+      call: function (method) {
+        var denied = need('python'); if (denied) return denied;
+        var args = Array.prototype.slice.call(arguments, 1);
+        var handlers = window.__antMockPython;
+        if (typeof handlers === 'function') {
+          return Promise.resolve().then(function () { return handlers(method, args); });
+        }
+        if (handlers && typeof handlers[method] === 'function') {
+          return Promise.resolve().then(function () { return handlers[method].apply(null, args); });
+        }
+        return fail('MOCK_NOT_CONFIGURED', '请配置 __antMockPython，或运行 dev_python.py');
+      }
     },
     base64ToBytes: function (base64) {
       var binary = atob(base64 || '');
@@ -229,19 +308,104 @@
         });
       },
       setJSON: function (k, v) { return window.ant.storage.set(k, JSON.stringify(v)); },
-      remove: function (k) { localStorage.removeItem(KEY_PREFIX + k); return Promise.resolve(); },
+      remove: function (k) {
+        var denied = need('storage'); if (denied) return denied;
+        localStorage.removeItem(KEY_PREFIX + k); return Promise.resolve();
+      },
       clear: function () {
+        var denied = need('storage'); if (denied) return denied;
         Object.keys(localStorage).forEach(function (k) {
           if (k.indexOf(KEY_PREFIX) === 0) localStorage.removeItem(k);
         });
         return Promise.resolve();
       },
       keys: function () {
+        var denied = need('storage'); if (denied) return denied;
         return Promise.resolve(Object.keys(localStorage)
           .filter(function (k) { return k.indexOf(KEY_PREFIX) === 0; })
           .map(function (k) { return k.slice(KEY_PREFIX.length); }));
       }
     },
+
+    /* 私有文件的浏览器模拟：数据在 localStorage，仅用于交互验证，不等同宿主文件系统。 */
+    file: (function () {
+      var key = 'ant-mock-files:' + (window.__antMockAppId || 'com.mock.app');
+      function entries() { return JSON.parse(localStorage.getItem(key) || '{}'); }
+      function save(data) { localStorage.setItem(key, JSON.stringify(data)); }
+      function pathOf(path) {
+        path = String(path || '').replace(/\\/g, '/');
+        if (!path || /^(\/|[A-Za-z]:)/.test(path) || path.split('/').indexOf('..') >= 0) {
+          var error = new Error('必须是私有目录内相对路径'); error.code = 'INVALID_PATH'; throw error;
+        }
+        return path.replace(/^\.\//, '').replace(/\/$/, '');
+      }
+      function guarded(fn) {
+        return function () {
+          var denied = need('filesystem'); if (denied) return denied;
+          var args = arguments;
+          return Promise.resolve().then(function () { return fn.apply(null, args); });
+        };
+      }
+      function stat(path, data) {
+        var value = data[path];
+        if (!value) { var error = new Error('文件不存在'); error.code = 'NOT_FOUND'; throw error; }
+        return {path: path, type: value.type, size: value.base64 ? atob(value.base64).length : 0,
+          modifiedAt: value.modifiedAt};
+      }
+      function parents(path, data) {
+        var parts = path.split('/'); parts.pop();
+        while (parts.length) {
+          var parent = parts.join('/');
+          if (!data[parent]) data[parent] = {type: 'directory', modifiedAt: Date.now()};
+          parts.pop();
+        }
+      }
+      return {
+        write: guarded(function (path, content, options) {
+          path = pathOf(path); options = options || {};
+          var data = entries();
+          var binary = options.encoding === 'base64' ? atob(content) : unescape(encodeURIComponent(content));
+          if (options.append && data[path]) binary = atob(data[path].base64) + binary;
+          parents(path, data);
+          data[path] = {type: 'file', base64: btoa(binary), modifiedAt: Date.now()};
+          save(data); return stat(path, data);
+        }),
+        read: guarded(function (path, options) {
+          path = pathOf(path); var data = entries(); stat(path, data);
+          return options && options.encoding === 'base64' ? data[path].base64
+            : decodeURIComponent(escape(atob(data[path].base64 || '')));
+        }),
+        stat: guarded(function (path) { return stat(pathOf(path), entries()); }),
+        list: guarded(function (path) {
+          var data = entries(); var prefix = path ? pathOf(path) + '/' : '';
+          return Object.keys(data).filter(function (p) {
+            return p.indexOf(prefix) === 0 && p.slice(prefix.length).indexOf('/') < 0;
+          }).sort().map(function (p) { return stat(p, data); });
+        }),
+        mkdir: guarded(function (path) {
+          path = pathOf(path); var data = entries(); parents(path, data);
+          data[path] = {type: 'directory', modifiedAt: Date.now()}; save(data); return stat(path, data);
+        }),
+        rename: guarded(function (from, to, options) {
+          from = pathOf(from); to = pathOf(to); var data = entries(); stat(from, data);
+          if (data[to] && !(options && options.overwrite)) {
+            var error = new Error('目标已存在'); error.code = 'ALREADY_EXISTS'; throw error;
+          }
+          parents(to, data);
+          Object.keys(data).filter(function (p) { return p === from || p.indexOf(from + '/') === 0; })
+            .forEach(function (p) { data[to + p.slice(from.length)] = data[p]; delete data[p]; });
+          save(data); return stat(to, data);
+        }),
+        delete: guarded(function (path, options) {
+          path = pathOf(path); var data = entries(); stat(path, data);
+          var children = Object.keys(data).filter(function (p) { return p.indexOf(path + '/') === 0; });
+          if (children.length && !(options && options.recursive)) {
+            var error = new Error('目录非空'); error.code = 'DIRECTORY_NOT_EMPTY'; throw error;
+          }
+          children.concat(path).forEach(function (p) { delete data[p]; }); save(data);
+        })
+      };
+    })(),
 
     ui: {
       toast: function (m) { toastEl(String(m)); return Promise.resolve(); },
@@ -282,24 +446,6 @@
     navigateBack: function () { history.back(); return Promise.resolve({ moved: true }); },
     exitMiniApp: function () { console.warn('[ant-mock] exitMiniApp（浏览器里无操作）'); return Promise.resolve(); },
 
-    miniApp: {
-      open: function (options) {
-        var o = typeof options === 'string' ? { appId: options } : (options || {});
-        var denied = need('miniapp'); if (denied) return denied;
-        var opened = window.confirm('模拟打开小程序：' + (o.appId || ''));
-        if (opened) console.warn('[ant-mock] 浏览器里不会真的切换小程序');
-        return Promise.resolve({
-          opened: opened,
-          appId: o.appId,
-          name: o.appId,
-          resumed: false,
-          path: o.path
-        });
-      },
-      getLaunchOptions: function () { return Promise.resolve(miniAppLaunchOptions); },
-      onOpen: function (h) { return on('miniApp.open', h); }
-    },
-
     onShow: function (h) { return on('app.show', h); },
     onHide: function (h) { return on('app.hide', h); },
 
@@ -312,6 +458,11 @@
         if (headers && Object.keys(headers).length) {
           /* <video src> 发不出自定义头，真机上宿主会带上，浏览器里只能提示 */
           console.warn('[ant-mock] player.open 的 headers 在浏览器里无法生效（真机宿主会带上）:', Object.keys(headers).join(', '));
+        }
+        var hostSniff = !!o.sniff || String(o.parse) === '1' || String(o.jx) === '1';
+        if (hostSniff) {
+          /* 网页地址要靠宿主的解析器 + WebView 嗅探，浏览器里放不了 */
+          console.warn('[ant-mock] player.open 这条线路要宿主解析/嗅探（parse/jx=1 或 sniff:true），浏览器里只会当直链打开:', o.url);
         }
         emit('player.open', { url: o.url, title: o.title || o.url });
 
@@ -344,7 +495,7 @@
           window.__antMockVideo = null;
           emit('player.close', { url: o.url });
         });
-        return Promise.resolve({ route: '/mock', url: o.url });
+        return Promise.resolve({ route: '/mock', url: o.url, sniff: hostSniff });
       },
       getState: function () {
         var v = window.__antMockVideo;
@@ -389,13 +540,31 @@
     }
   };
 
+  // 这些异步能力也按 manifest 权限自检；本地同步事件订阅不要求权限。
+  function guardMethod(object, method, permission) {
+    var original = object[method];
+    object[method] = function () {
+      var denied = need(permission);
+      return denied || original.apply(this, arguments);
+    };
+  }
+  ['toast','loading','hideLoading','confirm','actionSheet'].forEach(function (method) {
+    guardMethod(window.ant.ui, method, 'ui');
+  });
+  ['get','set'].forEach(function (method) { guardMethod(window.ant.clipboard, method, 'ui'); });
+  ['navigateTo','redirectTo','navigateBack','exitMiniApp'].forEach(function (method) {
+    guardMethod(window.ant, method, 'navigate');
+  });
+  guardMethod(window.ant.player, 'getState', 'player');
+
   /* 浏览器里用真键盘模拟遥控器 */
   window.addEventListener('keydown', function (e) {
+    if (e.target && (e.target.matches('input,textarea,select') || e.target.isContentEditable)) return;
     var map = {
       ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown',
       ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight', Enter: 'Enter'
     };
-    if (map[e.key]) emit('keydown', { key: map[e.key] });
+    if (map[e.key]) { e.preventDefault(); emit('keydown', { key: map[e.key] }); }
   });
 
   /* 页面可见性 → app.show / app.hide */

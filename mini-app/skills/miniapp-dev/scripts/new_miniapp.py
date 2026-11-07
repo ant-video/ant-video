@@ -2,7 +2,7 @@
 """从模板生成一个小程序骨架。
 
     python3 new_miniapp.py --app-id com.foo.notes --name 我的笔记 \\
-        [--out miniapps/notes] [--permissions ui,storage] [--description '一句话介绍'] [--node]
+        [--out miniapps/notes] [--permissions ui,storage] [--description '一句话介绍'] [--node | --python]
 
 骨架里已经预置了相对路径引用、body 背景、安全区、深色模式、TV 遥控焦点，以及浏览器
 mock SDK，直接往 app.js 里写业务即可。--permissions 缺省 ui,storage，按需增删——
@@ -25,6 +25,7 @@ MOCK_FILE = SKILL_DIR / "assets" / "ant-mock.js"
 KNOWN_PERMS = [
     "network",
     "storage",
+    "filesystem",
     "ui",
     "navigate",
     "miniapp",
@@ -32,6 +33,7 @@ KNOWN_PERMS = [
     "source",
     "service",
     "node",
+    "python",
 ]
 APP_ID_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$")
 
@@ -77,10 +79,15 @@ def main():
     parser.add_argument("--out", help="输出目录，缺省 miniapps/<appId 最后一段>")
     parser.add_argument("--permissions", default="ui,storage", help=",".join(KNOWN_PERMS))
     parser.add_argument("--description", default="", help="一句话描述，缺省用 name")
-    parser.add_argument(
+    runtime = parser.add_mutually_exclusive_group()
+    runtime.add_argument(
         "--node",
         action="store_true",
         help="生成 server/ 骨架并声明 node 块（宿主以 worker 跑你的 Node.js 后端）",
+    )
+    runtime.add_argument(
+        "--python", action="store_true",
+        help="生成 app.py 与 ant.python.call 示例（宿主内嵌 CPython，不与 --node 共用）",
     )
     args = parser.parse_args()
 
@@ -93,52 +100,81 @@ def main():
         sys.exit(f"无法识别的权限 {unknown}，可选：{'/'.join(KNOWN_PERMS)}")
     if args.node and "node" not in perms:
         perms.append("node")
+    if args.python and "python" not in perms:
+        perms.append("python")
 
     out = Path(args.out).expanduser() if args.out else Path("miniapps") / args.app_id.rsplit(".", 1)[-1]
     if out.exists() and any(out.iterdir()):
         sys.exit(f"目录已存在且非空：{out}")
 
     out.mkdir(parents=True, exist_ok=True)
-    node_block = (
-        ""
-        if not args.node
-        else (
-            ",\n"
-            '  "node": {\n'
-            '    "entry": "server/index.js",\n'
-            '    "config": "server/index.config.js"\n'
-            "  }"
-        )
-    )
     replacements = {
         "__APP_ID__": args.app_id,
         "__NAME__": args.name,
         "__DESCRIPTION__": args.description or args.name,
         "__PERMISSIONS__": json.dumps(perms, ensure_ascii=False),
         "__PERMISSIONS_JS__": json.dumps(perms, ensure_ascii=False),
-        "__NODE_BLOCK__": node_block,
     }
     for src in sorted(TEMPLATE_DIR.iterdir()):
-        if not src.is_file():
+        if not src.is_file() or src.name == "manifest.json":
             continue
         text = src.read_text(encoding="utf-8")
         for token, value in replacements.items():
             text = text.replace(token, value)
         (out / src.name).write_text(text, encoding="utf-8")
+    manifest = {
+        "appId": args.app_id, "name": args.name, "version": "1.0.0",
+        "versionCode": 1, "renderer": "webview", "entry": "index.html",
+        "description": args.description or args.name, "permissions": perms,
+    }
+    if args.node:
+        manifest["node"] = {"entry": "server/index.js", "config": "server/index.config.js"}
+    if args.python:
+        manifest["python"] = {"entry": "app.py"}
+    (out / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     shutil.copy2(MOCK_FILE, out / "ant-mock.js")
     if args.node:
         server_dir = out / "server"
         server_dir.mkdir()
         (server_dir / "index.js").write_text(NODE_SERVER_JS, encoding="utf-8")
         (server_dir / "index.config.js").write_text(NODE_CONFIG_JS, encoding="utf-8")
+    if args.python:
+        shutil.copy2(SKILL_DIR / "assets" / "python" / "app.py", out / "app.py")
+        html_path = out / "index.html"
+        html = html_path.read_text(encoding="utf-8")
+        html = html.replace('</main>', '<button data-action="python">调用 Python hello</button>\n  </main>')
+        html = html.replace('<script src="./ant-mock.js">', '''<script>
+    window.__antMockPython = function (method, args) {
+      return fetch('./__python/' + encodeURIComponent(method), {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({args: args})
+      }).then(function (response) {
+        return response.json().then(function (data) {
+          if (!response.ok) throw new Error(data.message || 'Python 调用失败');
+          return data;
+        });
+      });
+    };
+  </script>\n  <script src="./ant-mock.js">''')
+        html_path.write_text(html, encoding="utf-8")
+        js_path = out / "app.js"
+        js = js_path.read_text(encoding="utf-8").replace("var actions = {", """var actions = {
+    python: function () {
+      return ant.python.call('hello', {name: '蚂蚁影视'}, 2).then(function (result) {
+        show('Python hello', result);
+      });
+    },""")
+        js_path.write_text(js, encoding="utf-8")
 
     checker = SKILL_DIR / "scripts" / "check_miniapp.py"
     packer = SKILL_DIR / "scripts" / "pack_miniapp.py"
-    print(f"✓ 已生成 {out}（权限：{', '.join(perms)}{'，含 Node 服务' if args.node else ''}）\n")
+    print(f"✓ 已生成 {out}（权限：{', '.join(perms)}{'，含 Node 服务' if args.node else '，含 Python 后端' if args.python else ''}）\n")
     print("下一步：")
     print(f"  cd {out} && python3 -m http.server 3000    # 阶段① 浏览器里开发（90% 的时间）")
     if args.node:
-        print(f"  node server/index.js                      # 本地直接跑 Node 服务自测（需自备 PORT 环境变量）")
+        print('  # 本地 Node 自测需调用导出的 start(config)，并设置 DEV_HTTP_PORT；不能只执行入口文件')
+    if args.python:
+        print(f"  python3 {SKILL_DIR / 'scripts' / 'dev_python.py'} {out} --port 3000    # HTML + 真 Python 本地联调")
     print(f"  python3 {checker} {out}    # 打包前预检")
     print(f"  python3 {packer} {out}     # 预检通过后打包成 zip")
 

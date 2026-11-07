@@ -2,8 +2,9 @@
 
 [蚂蚁影视](../README.md)宿主的小程序生态目录：开发文档、示例小程序、注入 SDK、市场分发清单，以及一套可供 Codex / Claude Code 使用的开发 skill。
 
-小程序是纯 HTML/JS/CSS 包，跑在宿主容器的 WebView 里，通过宿主在 document-start 注入的
-`window.ant` 调用宿主能力（播放器、采集源、存储、UI）。**写小程序不需要碰 Flutter，也不需要重新编译宿主。**
+小程序界面是 HTML/JS/CSS，跑在宿主 WebView 里，通过 document-start 注入的 `window.ant`
+调用播放器、采集源、存储等能力；包内也能携带 Python 或 Node.js 后端。使用已支持这些能力的
+宿主无需修改 Flutter 或重新编译。Python 的函数/HTTP 服务契约见 [Python 参考](skills/miniapp-dev/references/python.md)。
 
 ## 目录结构
 
@@ -11,9 +12,9 @@
 mini-app/
 ├─ docs/
 │  ├─ miniapp-developer-guide.md   开发引导：manifest、权限、JSAPI、打包发版
-│  └─ miniapp-standalone-dev.md    脱离宿主开发调试：三阶段流程 + mock SDK 全文
+│  └─ miniapp-standalone-dev.md    浏览器、Python 联调、宿主调试与安装验收
 ├─ miniapps/
-│  ├─ ant-sdk.js                   宿主注入的真 SDK（协议 v4，行为有疑问时以它为准）
+│  ├─ ant-sdk.js                   当前注入 SDK v6（环境 sdkVersion 仍为 5，优先判断方法存在）
 │  ├─ demo/                        覆盖全部 JSAPI 的最小示例
 │  ├─ app-launcher/                跨小程序打开的发起端
 │  ├─ launch-target/               启动参数与 onOpen 的接收端
@@ -22,6 +23,8 @@ mini-app/
 │  ├─ cms-t4-bridge/               CMS JSON → T4 兼容反向服务
 │  ├─ source-t4-bridge/            宿主采集源 → T4 兼容反向服务
 │  ├─ node-demo/                   Node.js 后端服务示例（worker_threads）
+│  ├─ python-demo/                 Python 顶层函数调用与 HTTP 服务
+│  ├─ sudugu-reader/               速读谷 Python 小说阅读器
 │  ├─ tetris/                      俄罗斯方块（纯前端游戏 + TV 遥控）
 │  └─ emby/                        影视库（多页面 + 采集源 + 播放 + 续播）
 ├─ market/
@@ -42,11 +45,14 @@ mini-app/
 | **CMS 转 T4 服务** `miniapps/cms-t4-bridge/` | `com.leospring.cms_t4_bridge` | ui / storage / network / service | 配置多个 CMS JSON 接口，按 `site` 提供 T4 首页、分类、搜索、详情和 `config` 接口，页面给出可复制的内部与局域网地址 |
 | **采集源转 T4 服务** `miniapps/source-t4-bridge/` | `com.leospring.source_t4_bridge` | ui / storage / service / source | 复用宿主已配置的采集源，按 `site` 提供 T4 首页、分类、搜索、详情和播放接口（爬虫源由宿主解析），页面给出可复制的内部与局域网地址 |
 | **Node 服务示例** `miniapps/node-demo/` | `com.leospring.node_demo` | node | 演示把 Node.js 后端打进小程序包：宿主以 worker 起你的 `server/index.js`（可带 `node_modules`），`miniapp://com.leospring.node_demo` 即服务地址，详情页可手动启停。需要支持 Node 服务的宿主版本 |
+| **[Python 示例](miniapps/python-demo/README.md)** | `com.example.python.demo` | python / ui / storage | 顶层函数 ant.python.call 直接返回 JSON，serve 提供 HTTP 服务；标准库即可本地联调 |
+| **[速读谷小说](miniapps/sudugu-reader/README.md)** | `com.leospring.sudugu_reader` | python / ui / storage | 基于附件 Python 采集脚本：分类/搜索/简介/目录、分页正文、书架、阅读进度、字号/行距/夜间配色、TV 遥控 |
 | **LogVar 弹幕服务（Node 版）** `miniapps/logvar-danmu-node/` | `com.logvar.danmu.node` | node | 真实的 Node 服务小程序：把上游 danmu_api 打成单个 CJS bundle 跑在宿主内嵌 node 里。目录内是宿主适配层与构建脚本，业务源码来自上游 checkout（AGPL-3.0） |
 | **俄罗斯方块** `miniapps/tetris/` | `com.leospring.tetris` | ui / storage / navigate | 掌机复刻，Web Audio 音效 + LCD 光影；自带 `ant-mock.js`，浏览器里直接能玩 |
 | **影视库** `miniapps/emby/` | `com.leospring.emby` | ui / storage / navigate / player / source | Emby 风格四页面（首页 / 媒体库 / 搜索 / 详情），复用宿主已配置的采集源，续播记录存 `ant.storage` |
 
-示例都以 `com.leospring.*` 命名，与宿主内置的 `com.ant.*` 分开 —— appId 是唯一键，撞了会被当成同一个小程序。体验跨小程序链路时先安装“启动参数接收器”，再打开“小程序启动台”。
+示例使用独立 appId，与宿主内置的 `com.ant.*` 分开；appId 是唯一键，撞了会被当成同一个小程序。
+体验跨小程序链路时先安装“启动参数接收器”，再打开“小程序启动台”。
 
 市场清单里有两个 **LogVar 弹幕服务**，都演示**服务型小程序**：整个弹幕聚合服务跑在小程序里，
 播放器直接从它取弹幕，不用再自己部署 vercel / docker。
@@ -57,7 +63,8 @@ mini-app/
 - `com.logvar.danmu.node` —— **Node 版**：服务跑在宿主内嵌 node 里（worker_threads），
   `fetch` 与 node 内置模块都是真的，权限只要 `node`。适配层在本仓库
   `miniapps/logvar-danmu-node/`，构建方式见目录内 README。注意当前版本**没有配置界面**
-  （SDK 还没给页面访问本小程序 node 服务的通道），配置写在包内，改配置要重新打包。
+  配置写在包内，改配置要重新打包。现在页面可经 ant.request('miniapp://…') 请求服务，
+  或先用 ant.resolveService 得到供 fetch 使用的实际地址。
 
 两者都基于 huangxd-/danmu_api（AGPL-3.0），包内附 `LICENSE` 与 `SOURCE.md`。
 做法见下面的「服务型小程序」一节。
@@ -135,7 +142,7 @@ python3 skills/miniapp-dev/scripts/new_miniapp.py \
 | 阶段 | 跑在哪 | 反馈速度 | 能验证 | 验证不了 |
 |---|---|---|---|---|
 | ① 纯浏览器 | Chrome/Safari + `ant-mock.js` | 刷新即可 | 布局、交互、业务逻辑 | 真实 JSAPI、权限、播放器、采集源 |
-| ② 宿主调试模式 | 宿主容器直连你的 dev server | 点「重新加载」 | 全部真实能力、TV 遥控、真机表现 | manifest 校验与权限声明（调试模式权限全开且不读 manifest） |
+| ② 宿主调试模式 | 宿主容器直连你的 dev server | 点「重新加载」 | 注入 JSAPI、TV 遥控、真机表现 | manifest/权限声明、包内 Python/Node 后端（不读取 manifest） |
 | ③ 打包安装 | 宿主，正式安装 | 重新打包导入 | 安装校验、升级、卸载、分发 | — |
 
 90% 的时间应该待在 ①。
@@ -152,7 +159,7 @@ python3 skills/miniapp-dev/scripts/check_miniapp.py miniapps/hello
 python3 skills/miniapp-dev/scripts/pack_miniapp.py  miniapps/hello
 ```
 
-预检除了覆盖安装器的全部校验，还会**扫代码里实际调用的 `ant.*` 反查权限声明**、绝对路径引用、
+预检核对安装规则、Python/Node 入口与互斥声明，还会**扫代码里实际调用的 `ant.*` 反查权限声明**、绝对路径引用、
 `body` 背景缺失、TV 按键缺失 —— 这几项是调试模式测不出来的。有构建流程时检查 `dist/`，不是源码目录。
 
 容器操作收在一个可拖动的**悬浮球**里：重新加载 / 日志 / 关闭。日志面板收了 JSAPI 调用与返回、
@@ -160,7 +167,7 @@ python3 skills/miniapp-dev/scripts/pack_miniapp.py  miniapps/hello
 
 ## JSAPI 速查
 
-全部返回 Promise，失败 reject 一个带 `code` / `api` 的 Error。方括号是所需权限，
+异步 API 返回 Promise，事件注册和同步工具除外，失败 reject 一个带 `code` / `api` 的 Error。方括号是所需权限，
 **manifest 里没声明的能力一律 `PERMISSION_DENIED`**。大多数权限声明后直接可用；
 `miniapp` 会把用户带到另一个应用，所以每次打开仍会展示目标名称让用户确认。
 
@@ -171,6 +178,11 @@ ant.request({url,method,headers,data,timeout,responseType,followRedirects})
                           // → {statusCode,headers,data,responseType,url}            [network]
 ant.requestJson({url})                          // 非 2xx / 非法 JSON 会 reject         [network]
 ant.requestBytes({url}) · base64ToBytes(s)      // 二进制，→ Uint8Array                [network]
+ant.requestStream({url,onHeaders,onData,onError,onDone,onAbort})                        [network]
+ant.requestSSE(options,onDataLine) · readLines(onLine) // SSE data 行 / 文本分块
+ant.resolveService('miniapp://com.example.service/path')                               [miniapp]
+ant.python.call('hello', ...jsonArgs)                                                    [python]
+ant.file.write/read/stat/list/mkdir/rename/delete()                                     [filesystem]
 ant.storage.get/set/getJSON/setJSON/remove/clear/keys()                                 [storage]
 ant.ui.toast/loading/hideLoading/confirm({title,content})/actionSheet([...])             [ui]
 ant.clipboard.get/set(text)                                                             [ui]
@@ -193,6 +205,28 @@ GBK 网页必须走这条，缺省的 `'text'` 会让宿主按 charset 解码，
 采集源返回宿主内部的 `vod_*` 蛇形字段；用户可能一个站点都没配，`list()` 要按空数组处理。
 拿到 `source.play` 的地址接 `ant.player.open()` 就是一条完整的看片链路（自动复用 M3U8 代理、
 去广告、内核切换），它返回的 `header` 可以原样传给 `player.open` 的 `headers`。
+
+## Python 示例与小说阅读器
+
+- [安装速读谷小说](market/zip/sudugu-reader-v1.zip)：导入后即可打开书城，无需外部部署或宿主采集源。
+- [安装 Python 最小示例](market/zip/python-demo-v2.zip)：点击按钮验证包内顶层函数调用。
+
+```bash
+python3 skills/miniapp-dev/scripts/new_miniapp.py --app-id com.example.python --name Python示例 --python
+python3 -m venv /tmp/ant-miniapp-dev
+/tmp/ant-miniapp-dev/bin/pip install -r miniapps/sudugu-reader/requirements.txt
+/tmp/ant-miniapp-dev/bin/python skills/miniapp-dev/scripts/dev_python.py miniapps/sudugu-reader --port 3000
+```
+
+打开 http://127.0.0.1:3000 本地联调；?demo=1 仅预览标注的示例内容，宿主始终调用真实 Python。
+Python 后端需要 `python` 权限与 `python.entry`，与 node 块互斥；HTTP 服务导出 serve 或 Flask app，
+不自行监听端口。requirements.txt 只供本机开发，宿主不自动 pip install。
+Android 需 ARM 设备，其它平台也需带完整 Python 运行时的宿主构建。最终导入 zip 验证内嵌执行。
+
+```bash
+python3 skills/miniapp-dev/scripts/test_tooling.py
+/tmp/ant-miniapp-dev/bin/python test/python_sudugu_reader_test.py
+```
 
 ## 服务型小程序（`ant.serve`）
 
@@ -257,10 +291,11 @@ Cloudflare Worker 风格的代码可以直接 `new URL(req.url)`。返回标准 
 | `viewport-fit=cover` + `env(safe-area-inset-*)` | 刘海屏 / 手势条被裁 |
 
 改不了的限制：`ant.request` 只允许 http/https，回环与内网地址（`localhost`、`127.x`、`10.x`、
-`172.16-31.x`、`192.168.x`、`169.254.x`）一律 `FORBIDDEN_HOST`，响应体 ≤10MB，超时上限 30s；
+`172.16-31.x`、`192.168.x`、`169.254.x`）直接指定时 `FORBIDDEN_HOST`，宿主解析的 miniapp 服务/注册端点为例外；响应体 ≤10MB，当前超时参数上限 600s；
 `ant.storage` 配额 5MB、key ≤256 字符；采集源单次超时 60s、并发上限 3；
 `ant.serve` 单次 60s 超时、请求体 ≤1MB；
 包内单文件 ≤20MB、解压后 ≤100MB、文件数 ≤2000，不能含符号链接。
+Node/Python 后端包解压后 ≤200MB / 10000 文件；ant.file 总配额 20MB、单文件 5MB。
 
 ## 分发
 
@@ -306,8 +341,8 @@ WebView 直接开这个地址，SDK 照旧注入。装法是「+ → 从链接�
 
 ## Codex / Claude Code Skill
 
-`skills/miniapp-dev/` 是一份自带资料的 skill，唯一外部依赖是 `python3`（标准库即可，不需要
-zip/md5 命令，也不需要 Flutter、Node、宿主源码）。可装进 Codex skills，或拷到
+`skills/miniapp-dev/` 是自带资料的 skill，脚手架/预检/打包仅需 python3 标准库；Python 本地业务
+联调还需安装所用依赖，不需要 Flutter 或宿主源码。可装进 Codex skills，或拷到
 `~/.claude/skills/` / 项目的 `.claude/skills/`。触发词覆盖「小程序 / miniapp」、JSAPI 名和错误码。
 
 ```
@@ -316,11 +351,14 @@ skills/miniapp-dev/
 ├─ agents/openai.yaml          Codex 列表展示与默认提示
 ├─ references/jsapi.md         完整 JSAPI 参考：manifest 全字段、权限、签名与返回结构、
 │                              事件表、错误码表、硬限制、完整看片链路示例
+├─ references/python.md        Python 函数/HTTP/WSGI、依赖与平台、小说采集适配
 ├─ assets/ant-mock.js          浏览器 mock SDK（检测到真 SDK 自动退让，打包时留着无害）
 ├─ assets/template/            手写时的起点模板
 └─ scripts/
    ├─ new_miniapp.py           脚手架
-   ├─ check_miniapp.py         预检（安装器全部校验 + 权限反查 + 静默失败项）
+   ├─ dev_python.py            HTML + Python 本机联调
+   ├─ test_tooling.py          标准库即可运行的脚手架与打包行为测试
+   ├─ check_miniapp.py         预检（安装约束 + 后端声明 + 权限反查）
    └─ pack_miniapp.py          打包（python zipfile，保证 manifest 落在包根）
 ```
 

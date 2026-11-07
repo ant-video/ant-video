@@ -192,6 +192,101 @@
     });
   }
 
+  /**
+   * 发起流式请求。Dart 消费 HTTP/SSE 流，再通过 ant 事件把增量推回页面，
+   * 因此不受 WebView CORS 和 ReadableStream 支持差异影响。
+   *
+   * options 里可传 onHeaders / onData / onError / onDone / onAbort 回调。
+   * @returns {Promise<{id:string, abort:function}>}
+   */
+  function requestStream(options) {
+    var opts = typeof options === 'string' ? { url: options } : options || {};
+    var streamId = 'stream_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    var closed = false;
+    var listener = on('request.stream', function (data) {
+      if (!data || data.id !== streamId) return;
+      if (data.kind === 'headers') {
+        if (typeof opts.onHeaders === 'function') opts.onHeaders(data);
+        return;
+      }
+      if (data.kind === 'data') {
+        if (typeof opts.onData === 'function') {
+          setTimeout(function () { opts.onData(data.data || ''); }, 0);
+        }
+        return;
+      }
+      if (data.kind === 'error') {
+        if (closed) return;
+        closed = true;
+        off('request.stream', listener);
+        if (typeof opts.onError === 'function') opts.onError(new Error(data.message || '请求失败'));
+        return;
+      }
+      if (data.kind === 'abort') {
+        if (closed) return;
+        closed = true;
+        off('request.stream', listener);
+        if (typeof opts.onAbort === 'function') opts.onAbort();
+        return;
+      }
+      if (data.kind === 'done') {
+        if (closed) return;
+        closed = true;
+        off('request.stream', listener);
+        if (typeof opts.onDone === 'function') opts.onDone();
+      }
+    });
+
+    var handle = {
+      id: streamId,
+      abort: function () {
+        return invoke('requestStream.abort', { streamId: streamId }).catch(function () {});
+      }
+    };
+    return invoke('requestStream', {
+      url: opts.url,
+      method: opts.method || 'GET',
+      headers: opts.headers || null,
+      data: opts.data,
+      timeout: opts.timeout,
+      followRedirects: opts.followRedirects !== false,
+      streamId: streamId
+    }).then(function (res) {
+      handle.statusCode = res && res.statusCode;
+      return handle;
+    }).catch(function (error) {
+      closed = true;
+      off('request.stream', listener);
+      throw error;
+    });
+  }
+
+  /** 逐行解析 HTTP/SSE 文本流；onEvent 收到不包含行结束符的行。 */
+  function readLines(onEvent) {
+    var buffer = '';
+    return function (chunk) {
+      buffer += String(chunk || '');
+      var lines = buffer.split(/\r?\n/);
+      buffer = lines.pop();
+      lines.forEach(onEvent);
+    };
+  }
+
+  /** 解析 SSE data 事件；返回 Promise，通过 onEvent 输出每个 data 字段。 */
+  function requestSSE(options, onEvent) {
+    var previous = options.onData || null;
+    var feed = readLines(function (line) {
+      if (line.indexOf('data:') !== 0) return;
+      onEvent(line.slice(5).replace(/^ /, ''));
+    });
+    var opts = Object.assign({}, options);
+    opts.onData = function (chunk) {
+      feed(chunk);
+      if (previous) previous(chunk);
+    };
+    return requestStream(opts);
+  }
+
   /** base64 串 → Uint8Array。 */
   function base64ToBytes(base64) {
     var binary = atob(base64 || '');
@@ -231,6 +326,21 @@
     });
   }
 
+  /**
+   * 把 `miniapp://<appId>[/path]` 换成可直接使用的同机 http 地址。
+   *
+   * 导航（location / `<a>`）与 `ant.request` 能直接吃 miniapp:// 写法，但页面里的
+   * `fetch` / `XMLHttpRequest` 与 `<video>` / `<img>` 的 src 用不了自定义协议，
+   * 先调这个拿到真地址再用。需要 miniapp 权限。
+   *
+   * @returns {Promise<string>} 形如 http://127.0.0.1:<port>/<token>/__service<path>
+   */
+  function resolveService(url) {
+    return invoke('resolveService', { url: url }).then(function (res) {
+      return res && res.url;
+    });
+  }
+
   /* ---------------- 存储 ---------------- */
 
   var storage = {
@@ -261,6 +371,51 @@
     },
     keys: function () {
       return invoke('storage.keys', {});
+    }
+  };
+
+  var file = {
+    write: function (path, content, options) {
+      var opts = options || {};
+      return invoke('file.write', {
+        path: path,
+        content: content,
+        encoding: opts.encoding || 'text',
+        append: opts.append === true
+      });
+    },
+    read: function (path, options) {
+      var opts = options || {};
+      return invoke('file.read', {
+        path: path,
+        encoding: opts.encoding || 'text'
+      }).then(function (res) {
+        return res ? res.data : '';
+      });
+    },
+    stat: function (path) {
+      return invoke('file.stat', { path: path });
+    },
+    list: function (path) {
+      return invoke('file.list', { path: path || '' }).then(function (res) {
+        return res ? res.entries : [];
+      });
+    },
+    mkdir: function (path) {
+      return invoke('file.mkdir', { path: path });
+    },
+    rename: function (from, to, options) {
+      return invoke('file.rename', {
+        from: from,
+        to: to,
+        overwrite: !!(options && options.overwrite)
+      });
+    },
+    delete: function (path, options) {
+      return invoke('file.delete', {
+        path: path,
+        recursive: !!(options && options.recursive)
+      });
     }
   };
 
@@ -407,6 +562,19 @@
     }
   };
 
+  /* ---------------- Python ---------------- */
+
+  /**
+   * 调用包内 manifest.python.entry 暴露的函数，需要 python 权限。
+   * method 必须是入口 .py 文件里的顶层函数名；args 按 JSON 值传参。
+   */
+  var python = {
+    call: function (method) {
+      var args = Array.prototype.slice.call(arguments, 1);
+      return invoke('python.call', { method: method, args: args });
+    }
+  };
+
   /* ---------------- 其它 ---------------- */
 
   var env = {
@@ -435,7 +603,7 @@
 
   window.ant = {
     /** SDK 协议版本，与宿主 env.getSystemInfo().sdkVersion 对应。 */
-    version: 4,
+    version: 6,
     invoke: invoke,
     on: on,
     off: off,
@@ -445,16 +613,22 @@
       return invoke('log', { message: String(message) });
     },
     request: request,
+    requestStream: requestStream,
+    readLines: readLines,
+    requestSSE: requestSSE,
     requestJson: requestJson,
     requestBytes: requestBytes,
+    resolveService: resolveService,
     base64ToBytes: base64ToBytes,
     serve: serve,
     storage: storage,
+    file: file,
     ui: ui,
     miniApp: miniApp,
     clipboard: clipboard,
     player: player,
     source: source,
+    python: python,
     tv: tv,
     navigateTo: function (url) {
       return invoke('navigateTo', { url: url });

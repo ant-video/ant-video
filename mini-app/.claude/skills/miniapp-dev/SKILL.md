@@ -1,29 +1,31 @@
 ---
 name: miniapp-dev
-description: 为 flutter_ant_video 宿主开发、调试、校验和打包 HTML/JS/CSS 小程序。用于创建小程序、维护 manifest、调用 ant.storage/player/source/request/serve/miniApp、打开其它小程序或外部网站、制作在线站点型小程序、携带 Node.js 后端服务（node 块 + node 权限）、处理广告过滤兼容、TV 遥控、反向服务、局域网共享，以及排查 PERMISSION_DENIED、HOST_NOT_ALLOWED、APP_NOT_INSTALLED、MISSING_MANIFEST、ENTRY_MISSING、白屏和 dev server 问题。
+description: 为蚂蚁影视开发、调试、校验和打包 WebView 小程序，支持 HTML/JS/CSS、包内 Python 或 Node.js 后端、小说阅读、流式请求、私有文件及在线站点。适用于 manifest、ant JSAPI、TV 遥控和安装运行问题；不用于修改 Flutter 宿主功能。
 ---
 
 # 小程序开发（flutter_ant_video 宿主）
 
-小程序是纯 HTML/JS/CSS 包，跑在宿主容器的 WebView 里，通过宿主在 document-start 注入的
-`window.ant` 调用宿主能力。**不需要改 Flutter 代码，也不需要重新编译宿主。**
+小程序界面是 HTML/JS/CSS，跑在宿主 WebView 里，通过 document-start 注入的 `window.ant`
+调用宿主能力；包内还可携带 Python 或 Node.js 后端。已支持这些能力的宿主无需修改 Flutter
+或重新编译。创建 Python 小程序时先读 [references/python.md](references/python.md)。
 
 ## 动手前确认三件事
 
-1. 要做的是**小程序**（HTML 包，本 skill）还是**宿主功能**（Flutter/Dart，改 `lib/`）？后者不适用本 skill。
+1. 要做的是**小程序**（WebView 包，可带 Python/Node 后端，本 skill）还是**宿主功能**（Flutter/Dart，改 `lib/`）？后者不适用本 skill。
 2. **输出位置**。默认当前目录下的 `miniapps/<slug>/`。用户指定了就用他们的。
 3. 是否要**随宿主内置**（进宿主仓库的 `assets/miniapp/`）。默认不是——见第 6 节，那节只在宿主仓库里有意义。
 
 ## 0. 本 skill 是自带资料的，可以脱离宿主仓库用
 
-参考资料、模板、mock SDK、校验与打包脚本全在 skill 目录里，**唯一外部依赖是 `python3`**
-（标准库即可，不需要 zip/md5 命令，也不需要 Flutter、Node、宿主源码）。把整个
-`miniapp-dev/` 目录拷到任何机器的 `~/.claude/skills/` 或某个项目的 `.claude/skills/` 下就能用。
+参考资料、模板、mock SDK、校验与打包脚本全在 skill 目录里，脚手架/预检/打包仅依赖
+`python3` 标准库。Python 本地联调还需安装业务代码依赖；宿主不会从 requirements.txt 自动 pip
+安装。整个目录可放在项目 `.agents/skills/`、个人 `~/.codex/skills/` 或 `.claude/skills/`。
 
 下面命令里的 `$SKILL` 指 skill 自己的目录，先解析一次：
 
 ```bash
-SKILL="$(ls -d .claude/skills/miniapp-dev ~/.claude/skills/miniapp-dev 2>/dev/null | head -1)"
+# 将它设为当前读到的 SKILL.md 所在目录；独立公开项目也可能放在 skills/ 下。
+SKILL=/absolute/path/to/miniapp-dev
 ```
 
 只有两处需要宿主仓库：第 6 节（做成内置小程序）和文末列的宿主源码/文档（可选的加深阅读）。
@@ -38,8 +40,9 @@ python3 "$SKILL/scripts/new_miniapp.py" \
 
 生成 `manifest.json` / `index.html` / `app.js` / `style.css` / `ant-mock.js`，硬规则（相对路径、
 `body` 背景、安全区、深色模式、TV 遥控焦点、mock 权限自检）已经预置好，直接往上写业务。
-`--permissions ui,storage,network,player,source,navigate,miniapp,service,node` 可指定权限，缺省
-`ui,storage`；`--node` 额外生成 `server/` 骨架并声明 node 块（见 7.3）。
+`--permissions ui,storage,filesystem,network,player,source,navigate,miniapp,service,node,python` 可指定
+权限，缺省 `ui,storage`；`--node` 生成 Node 服务（见 7.3）；`--python` 生成 `app.py`、Python
+声明和 `ant.python.call` 示例（见 7.4）。两种后端互斥。
 
 不用脚手架就手写时，模板在 `$SKILL/assets/template/`，逐条对齐第 4 节硬规则。
 
@@ -78,6 +81,10 @@ SDK 会自动退让，所以**打包时留着无害**。采集源没法模拟，
 **服务型小程序（`ant.serve`）在调试模式下测不了**：dev server 实例没有 loopback 服务，宿主
 没有可回调的入口。那部分只能装成 zip 之后验，见第 7.1 节。
 
+**Python/Node 后端也不会由 dev server 调试加载**：它不读取 manifest，也没有已安装的包目录。
+Python 本地联调用 `python3 "$SKILL/scripts/dev_python.py" miniapps/example --port 3000`；
+真正的内嵌运行时、包内依赖和 JSAPI 权限最后通过导入 zip 验证。
+
 ## 4. 硬规则（违反了会静默失败，逐条核对）
 
 | 规则 | 违反后的现象 |
@@ -88,16 +95,18 @@ SDK 会自动退让，所以**打包时留着无害**。采集源没法模拟，
 | `permissions` 覆盖实际用到的每个 API | 运行时 `PERMISSION_DENIED`；**调试模式全开，测不出来** |
 | `ant.miniApp.open` 只能由当前可见的前台页响应用户操作发起，目标 appId 必须已安装 | `NOT_FOREGROUND` / `APP_NOT_INSTALLED`；不要在后台定时器里自动拉起 |
 | 要支持 TV 就必须实现 `ant.tv.onKey` | 电视上遥控器完全没反应（WebView 不参与系统焦点） |
-| 持久化用 `ant.storage`，别用 `localStorage` | 每次启动 origin 端口都变，`localStorage` 不保证保留 |
+| 小对象持久化用 `ant.storage`，正文/附件等文件用 `ant.file` + `filesystem` 权限 | 每次启动 origin 端口都变，`localStorage` 不保证保留 |
 | 每次发版 `versionCode` +1 | 装了新版打开还是老的 |
 | `network.allowlist` 写了就要覆盖全部域名（不写＝`ant.request` 不限制，但**导航只剩同源**；导航不认 `*`） | `HOST_NOT_ALLOWED`；点站内链接弹「离开小程序」 |
 | 用了 `ant.serve` 就别依赖 DOM/动画/用户点击 | 宿主会在页面不可见时后台拉起你，那时 `requestAnimationFrame` 被节流、没人点按钮 |
 | 构建工具设 `base: './'`（Vite）/ `publicPath: './'`，路由用 hash 模式 | 白屏；刷新 404 |
 | `viewport-fit=cover` + `env(safe-area-inset-*)` | 刘海屏/手势条被裁 |
 
-改不了的限制：`ant.request` 只允许 http/https，回环与内网地址（`localhost`、`127.x`、`10.x`、
+普通外网请求只允许 http/https，回环与内网地址（`localhost`、`127.x`、`10.x`、
 `172.16-31.x`、`192.168.x`、`169.254.x`）一律 `FORBIDDEN_HOST`；响应体上限 10MB；`ant.storage`
-配额 5MB；采集源单次超时 60s、并发上限 3；`ant.serve` 单次 60s 超时、请求体 ≤1MB。
+配额 5MB；`ant.file` 总配额 20MB、单文件 5MB；采集源单次超时 60s、并发上限 3；
+`ant.serve` 单次 60s 超时、请求体 ≤1MB。宿主解析的 `miniapp://` 服务及其注册端点是网络限制
+的受控例外，别猜端口、token 或 Python key。Python 的 requests 不走 JSAPI 域名门禁。
 
 ### 4.1 在线站点型小程序（包着一个线上站点）
 
@@ -129,12 +138,13 @@ python3 "$SKILL/scripts/check_miniapp.py" miniapps/notes   # 预检
 python3 "$SKILL/scripts/pack_miniapp.py"  miniapps/notes   # 预检通过才打包，附带 size/md5
 ```
 
-预检覆盖了安装器的全部校验（manifest 合法性、入口存在、符号链接、体积与文件数上限），外加
+预检核对 manifest、后端声明/权限/入口、符号链接、体积与文件数上限，外加
 **扫代码里实际调用的 `ant.*` 反查权限声明**、绝对路径引用、`body` 背景缺失、TV 按键缺失。
 `ERROR` 必须清零再进宿主；`WARN` 逐条判断。有构建流程时检查 `dist/`，不是源码目录。
 
-打包用 python 的 `zipfile`，不依赖系统 `zip`；以 `.` 开头的文件与 `.git`/`node_modules`
-自动排除，`manifest.json` 保证落在包根。
+打包用 python 的 `zipfile`，不依赖系统 `zip`；隐藏文件及开发缓存自动排除，
+`manifest.json` 保证落在包根。普通包排除 node_modules，Node 包保留 node_modules；Python 包保留包内纯
+Python 依赖，排除 `__pycache__`、`.pyc`、虚拟环境。Node/Python 后端包上限都是 200MB / 10000 文件。
 
 装包：宿主 → 小程序 → 右上角 `+` → 「导入 zip 包」。开发期可用「导入文件夹」跳过打包
 （桌面与 iOS 可用，Android 分区存储下常读不到路径，那边还是用 zip）。
@@ -156,7 +166,7 @@ python3 "$SKILL/scripts/pack_miniapp.py"  miniapps/notes   # 预检通过才打�
 
 ## 7. JSAPI 速查
 
-全部返回 Promise，失败 reject 一个带 `code` / `api` 的 Error。
+异步 JSAPI 返回 Promise，事件订阅/同步转换工具除外；失败 reject 带 `code` / `api` 的 Error。
 
 ```js
 ant.env.getSystemInfo()                  // {platform,osVersion,isTV,appId,devMode,permissions,sdkVersion}
@@ -165,7 +175,12 @@ ant.request({url,method,headers,data,timeout,responseType,followRedirects})
                                          // → {statusCode,headers,data,responseType,url}  [network]
 ant.requestJson({url})                   // 非 2xx / 非法 JSON 会 reject          [network]
 ant.requestBytes({url}) · base64ToBytes(s)  // 二进制，→ Uint8Array               [network]
+ant.requestStream({url,onHeaders,onData,onError,onDone,onAbort})                  [network]
+ant.requestSSE(options, onDataLine) · readLines(onLine) // SSE data 行 / 分块行解析
+ant.resolveService('miniapp://com.example.service/path')                         [miniapp]
 ant.storage.get/set/getJSON/setJSON/remove/clear/keys()                          [storage]
+ant.file.write/read/stat/list/mkdir/rename/delete()                              [filesystem]
+ant.python.call('functionName', ...jsonArgs)                                      [python]
 ant.ui.toast/loading/hideLoading/confirm({title,content})/actionSheet([...])     [ui]
 ant.clipboard.get/set(text)                                                      [ui]
 ant.navigateTo/redirectTo(url) · navigateBack() · exitMiniApp()                  [navigate]
@@ -178,7 +193,10 @@ ant.serve(async req => resp)             // 宿主反过来调你，见下      
 ant.on/off/once(event, fn) · onShow(fn) · onHide(fn) · tv.onKey(fn)
 ```
 
-事件：`app.show`、`app.hide`、`miniApp.open`、`player.open`、`player.stateChange`、`player.close`、`keydown`。
+事件：`app.show`、`app.hide`、`miniApp.open`、`player.open`、`player.stateChange`、`player.close`、`keydown`、`request.stream`。
+能力判断优先检查方法存在；当前 SDK `ant.version` 为 6，宿主环境字段仍报 `sdkVersion: 5`，
+不要只靠数字判断 Python、文件或流式 API。`ant.request` 可直接请求 `miniapp://`；原生 fetch
+或媒体标签先用 `ant.resolveService`，解析出的实际地址不要持久化。
 `ant.player.open` 的 `headers` 是取流请求头（`source.play` 返回的 `header` 可原样传，单数也认，
 上限 32 条 / 单值 8192 字符）；`play.parse` / `play.jx` 为 `'1'` 的线路拿到的是网页地址，把整份
 `play` 原样交给 `ant.player.open()`，宿主会跑解析器和网页嗅探；自己抓的站点可用 `sniff: true`
@@ -286,6 +304,23 @@ python3 scripts/new_miniapp.py --app-id com.foo.svc --name 我的服务 --node
 - Android x86 模拟器没有内嵌 node，那里按「无可用服务」处理；
 - 完整说明见开发引导 §4.11，示例 `miniapps/node-demo/`。
 
+### 7.4 Python 后端与函数调用
+
+```bash
+python3 "$SKILL/scripts/new_miniapp.py" --app-id com.example.python --name Python示例 --python
+python3 "$SKILL/scripts/dev_python.py" miniapps/python --port 3000
+```
+
+manifest 需要 `"permissions": ["python"]` 与 `"python": {"entry": "app.py"}`。入口文件的
+**顶层函数**由 `await ant.python.call('hello', {name:'读者'}, 2)` 调用，返回值必须可 JSON 序列化。
+只做函数调用不需要 `serve`、`service`、`network` 权限；Python 采集 requests 的域名和超时自己控制。
+
+提供 HTTP 服务时导出 `serve(request)` 或可调用的 Flask/WSGI `app`；**不要 app.run()、不要自建端口**。
+宿主用 `miniapp://<appId>[/path]` 按需加载；局域网共享通过宿主服务路由转发，同样无需 `service` 权限。
+运行时共享同一 CPython，包内模块按 `__file__` 父目录寻址，避免通用 `import app/utils` 的模块缓存碰撞。
+完整契约、依赖、正文采集适配和错误处理见 [references/python.md](references/python.md)。
+示例：`miniapps/python-demo/`（最小调用）、`miniapps/sudugu-reader/`（小说阅读）。
+
 ## 8. 排查
 
 | 现象 | 原因 |
@@ -309,6 +344,11 @@ python3 scripts/new_miniapp.py --app-id com.foo.svc --name 我的服务 --node
 | `ant.serve` 的 handler 在后台时不干活 | 依赖了 `requestAnimationFrame` / DOM / 用户点击——离屏时这些都不成立 |
 | 局域网地址在别的设备上 404 | token 被「重置地址」换过；或那个小程序的共享已关 |
 | 局域网地址返回 403 | 请求方不在私有网段（走了公网回环、或经过了某种转发） |
+| `PYTHON_ENTRY_MISSING` | 只有 python 权限，未声明 python.entry，或入口没打进包 |
+| `PYTHON_RUNTIME_UNAVAILABLE` | 设备不支持内嵌 Python（Android x86 不支持）、运行时缺失、入口导入失败；看宿主日志 |
+| `PYTHON_CALL_FAILED` | 入口没有该顶层函数、参数个数不匹配、异常或返回值不是 JSON；业务错误可返回 error 对象让页面展示 |
+| Python 本地能跑、宿主报 ImportError | 本机装了宿主没有的依赖，或带了本机编译的原生扩展；不会自动 pip install |
+| 多个 Python 小程序互相串状态 | 共用 sys.modules 或通用模块名；按包路径加载模块，不把命名空间隔离当进程沙箱 |
 
 其余错误码见 `$SKILL/references/jsapi.md` 的错误码表。
 
@@ -325,7 +365,8 @@ python3 scripts/new_miniapp.py --app-id com.foo.svc --name 我的服务 --node
 - `assets/miniapp/demo/` — 覆盖全部 JSAPI 的最小示例
 - `assets/miniapp/emby/` — 多页面 + 采集源 + 播放 + 续播的实战示例
 - 独立示例仓库的 `miniapps/app-launcher/`、`launch-target/`、`web-links/`、`online-site/`
-- `assets/miniapp/ant-sdk.js` 与 `lib/miniapp/bridge/` — SDK v3 真实现，行为有疑问时以它们为准
+- `assets/miniapp/ant-sdk.js` 与 `lib/miniapp/bridge/` — 当前 SDK 真实现，行为有疑问时以它们为准
+- `lib/python/spider_runner.py`、`spider_server.py`、`lib/miniapp/services/mini_app_python_service.dart` — Python 实际加载/路由契约
 
 维护提醒：宿主的 `ant-sdk.js` 加了新 API 时，同步更新本 skill 的 `assets/ant-mock.js`、
 `references/jsapi.md`，以及两个脚本里的权限表——`scripts/check_miniapp.py` 的 `KNOWN_PERMS`

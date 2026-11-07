@@ -90,7 +90,9 @@ Android 分区存储下拿到的路径常常读不了，那边还是用 zip。
 | `entry` | | 首屏。包内 HTML（缺省 `index.html`，可带子目录如 `pages/index.html`），或者一个 `http`/`https` 地址——那就是[在线站点型小程序](#25-在线站点型小程序)。其它协议（`file:` / `data:` / `javascript:`）与协议相对地址 `//host/path` 一律拒绝安装 |
 | `permissions` | | 见下节。**没声明的能力一律调不通** |
 | `network.allowlist` | | 两个作用：`ant.request` 能请求哪些域名（**不写等于不限制**），以及 WebView 能跳到哪些域名（**不写等于只能停在自己的入口 origin**；导航不认 `*`，得逐条写域名） |
-| `icon` | | 图标的**网络地址**（http/https）。不写、写成包内相对路径或者图挂了，宿主都用名称首字当图标 |
+| `node` | | Node.js 后端入口/配置，见 4.11，必须声明 node 权限 |
+| `python` | | `{"entry":"app.py"}`，必须声明 python 权限，与 node 块互斥，见 4.12 |
+| `icon` | | http/https 图标或包内相对路径，未提供或加载失败时回退名称首字 |
 | `description` | | 一句话描述 |
 | `minHostVersion` | | 要求的最低宿主版本，低于它安装会被拒 |
 | `pages` | | 第二期原生渲染用的页面列表，现在写了也不生效 |
@@ -137,12 +139,15 @@ Android 分区存储下拿到的路径常常读不了，那边还是用 zip。
 |---|---|
 | `ui` | `ant.ui.*`、`ant.clipboard.*` |
 | `storage` | `ant.storage.*` |
-| `network` | `ant.request`、`ant.requestJson`、`ant.requestBytes` |
+| `filesystem` | `ant.file.*`，私有文件读写，见 4.13 |
+| `network` | `ant.request`、`ant.requestJson`、`ant.requestBytes`、`ant.requestStream`、`ant.requestSSE` |
 | `navigate` | `ant.navigateTo` / `redirectTo` / `navigateBack` / `exitMiniApp` |
-| `miniapp` | `ant.miniApp.open`（打开其它已安装小程序） |
+| `miniapp` | `ant.miniApp.open`（打开其它已安装小程序）、`ant.resolveService`（只解析服务地址） |
 | `player` | `ant.player.*` |
 | `source` | `ant.source.*` |
 | `service` | `ant.serve`（见 4.10） |
+| `node` | manifest.node 包内 Node.js 服务（见 4.11） |
+| `python` | manifest.python 后端、ant.python.call（见 4.12） |
 
 `ant.env.getSystemInfo()` 和 `ant.log()` 不需要任何权限。
 
@@ -155,7 +160,9 @@ Android 分区存储下拿到的路径常常读不了，那边还是用 zip。
 
 ## 4. SDK 参考
 
-所有方法返回 Promise。失败时 reject 的 Error 带 `code`（见第 7 节）与 `api` 字段。
+异步 JSAPI 返回 Promise，事件订阅/文本行解析等同步工具除外。失败时 reject 的 Error 带
+`code`（见第 7 节）与 `api` 字段。当前 ant.version 为 6，环境 sdkVersion 仍为 5；
+用具体方法是否存在判断新能力，避免只比较版本数字。
 
 ### 4.1 环境与日志
 
@@ -189,7 +196,9 @@ const json = await ant.requestJson({ url: '...' });   // 非 2xx 或非法 JSON 
 
 请求走宿主的 HTTP 客户端，**不受浏览器 CORS 限制**——这是相对纯 H5 的最大优势。
 
-限制：只允许 http/https；不允许访问 `localhost`、`127.x`、`10.x`、`172.16-31.x`、`192.168.x`、`169.254.x` 等回环与内网地址；响应体上限 10MB；`host`、`content-length`、`connection` 三个请求头不允许自定义。
+限制：外网只允许 http/https，直接指定的回环/内网地址会被拒绝；宿主解析的 `miniapp://<appId>/path`
+服务及其注册端点是受控例外。响应体上限 10MB；`host`、`content-length`、`connection` 请求头不允许自定义。
+当前普通/流请求 timeout 缺省 15 秒、夹在 1~600 秒，流请求参数不保证整体/空闲时长。
 
 **二进制响应**要显式要：
 
@@ -529,6 +538,69 @@ module.exports = {
 **平台限制**：Android x86 模拟器没有内嵌 node 运行时（与 Python 源同限制），这类设备
 上解析会按「无可用服务」处理。真机（ARM）和桌面端都支持。
 
+### 4.12 Python 后端与 ant.python.call
+
+```json
+{"permissions":["python","storage","ui"], "python":{"entry":"app.py"}}
+```
+
+```python
+def hello(payload, extra=0):
+    return {"message": f"你好，{payload.get('name', '世界')}", "sum": extra + 3}
+
+def serve(request):
+    if request['path'] == '/check':
+        return {'ok': True}
+    return {'_status': 404, 'error': 'not found'}
+```
+
+```js
+const result = await ant.python.call('hello', {name:'读者'}, 2);
+```
+
+调用包内入口的顶层函数，位置参数/返回值按 JSON 传递；直接拿函数返回值，不解 result 包装层。
+类式爬虫需在入口增加顶层函数封装。Python 的 requests 不走 ant.request 权限/域名门禁，
+采集代码自己控制地址、重定向、超时和响应大小。
+
+HTTP 服务导出 serve(request) 或可调用的 Flask/WSGI app；WSGI 优先。不要 app.run()，不要自建端口。
+serve 的 dict 响应使用 `_status` / `_headers`，其余字段为 JSON body，与 JS ant.serve 契约不同。
+宿主通过 miniapp://<appId>/path 按需加载，Python 后端无需 service 权限；同样可由宿主共享到局域网。
+
+Python 使用共享内嵌 CPython，Android 仅 ARM 支持（x86 模拟器不可用），其它平台也需要完整运行时构建。
+入口 __file__ 的文件名由 key 派生，使用父目录寻址；避免共享 sys.modules 的同名 import 串包。
+宿主已带 requests/beautifulsoup4/flask 等，requirements.txt 不会触发 pip 安装；原生扩展必须针对目标平台。
+没有 WSGI app 的函数式入口可能重复加载，不依赖模块内存保存数据。
+
+脚手架和本地联调：
+
+```bash
+python3 skills/miniapp-dev/scripts/new_miniapp.py --app-id com.example.python --name Python示例 --python
+python3 skills/miniapp-dev/scripts/dev_python.py miniapps/python --port 3000
+```
+
+宿主 dev server 调试不读取 manifest/Python，最终导入 zip 验证内嵌执行和权限。
+完整契约与小说移植见 [Python 开发参考](../skills/miniapp-dev/references/python.md)。
+示例：miniapps/python-demo（最小调用）、miniapps/sudugu-reader（书城/搜索/目录/分页正文/书架/进度）。
+
+### 4.13 私有文件与流式网络
+
+```js
+await ant.file.write('notes/chapter.txt', '正文'); // filesystem；单文件 5MB，总配额 20MB
+const text = await ant.file.read('notes/chapter.txt');
+const entries = await ant.file.list('notes');
+await ant.file.delete('notes/chapter.txt');
+const stream = await ant.requestStream({url:'miniapp://com.example.python/events',
+  onData(text) { console.log(text); }, onDone() {}, onError(error) { console.warn(error); }});
+await stream.abort();
+await ant.requestSSE({url:'miniapp://com.example.python/events'}, dataLine => console.log(dataLine));
+const url = await ant.resolveService('miniapp://com.example.python/check'); // miniapp 权限
+```
+
+file 同样提供 stat/mkdir/rename，支持 text/base64 编码。read 直接返回字符串，list 返回同级条目数组。
+流请求需要 network 权限，句柄 Promise resolve 不代表流结束，完成由 onDone 通知；
+requestSSE 仅解析 data 行，多行事件自行合并。解析出的真实服务地址仅供当次 fetch/媒体标签使用，
+不要推导或持久化真实端口、token、Python key。
+
 ## 5. 打包与发版
 
 ```bash
@@ -591,7 +663,9 @@ try {
 | `HOST_NOT_ALLOWED` | 域名不在 `network.allowlist` 里 | 补白名单 |
 | `REQUEST_FAILED` | 网络层失败（超时、DNS、连接） | 重试或检查地址 |
 | `RESPONSE_TOO_LARGE` | 响应超过 10MB | 分页拉取 |
-| `QUOTA_EXCEEDED` | `ant.storage` 超 5MB | 清理旧数据 |
+| `QUOTA_EXCEEDED` | 键值存储或私有文件超出配额 | 清理旧数据 |
+| `PYTHON_ENTRY_MISSING` / `PYTHON_RUNTIME_UNAVAILABLE` / `PYTHON_CALL_FAILED` | Python 入口、运行时或调用不可用 | 核对 python 块/权限、设备运行时和函数参数，见 4.12 |
+| `INVALID_PATH` / `NOT_FOUND` / `FILE_TOO_LARGE` | 私有文件路径、存在性或大小错误 | 使用包外私有相对路径并分批读写 |
 | `INVALID_KEY` | storage key 为空或超 256 字符 | — |
 | `CROSS_ORIGIN` | 想跳到小程序之外的地址 | 把域名写进 `network.allowlist`，或用 `<a target="_blank">` 让用户确认后走浏览器 |
 | `APP_NOT_INSTALLED` | `miniApp.open` 的目标尚未安装 | 引导用户先从小程序中心安装 |
