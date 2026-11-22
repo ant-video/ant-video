@@ -60,10 +60,31 @@ class ToolingTest(unittest.TestCase):
 
     def test_new_js_apis_have_permission_gates(self):
         self.manifest(lambda m: m.update(permissions=[]))
-        (self.root / "app.js").write_text("ant.python.call('hello'); ant.file.read('a'); ant.requestStream({}); ant.resolveService('miniapp://com.foo.svc');")
+        (self.root / "app.js").write_text("ant.cloud.call('game', {}); ant.python.call('hello'); ant.file.read('a'); ant.requestStream({}); ant.resolveService('miniapp://com.foo.svc');")
         errors = "\n".join(message for code, message in self.report().errors if code == "MISSING_PERMISSION")
-        for perm in ["python", "filesystem", "network", "miniapp"]:
+        for perm in ["cloud", "python", "filesystem", "network", "miniapp"]:
             self.assertIn('"' + perm + '"', errors)
+
+    def test_cloud_scaffold_passes_precheck_and_packages_mock_permissions(self):
+        cloud_root = pathlib.Path(self.temp.name) / "cloud"
+        subprocess.run([sys.executable, str(SCRIPTS / "new_miniapp.py"),
+                        "--app-id", "com.example.party", "--name", "联网派对",
+                        "--permissions", "ui,storage,cloud", "--out", str(cloud_root)],
+                       check=True, capture_output=True)
+        with (cloud_root / "app.js").open("a") as app:
+            app.write("\nant.cloud.identity(); ant.cloud.call('game', {action:'ping'});\n")
+        subprocess.run([sys.executable, str(SCRIPTS / "check_miniapp.py"), str(cloud_root)],
+                       check=True, capture_output=True)
+        archive = pathlib.Path(self.temp.name) / "cloud.zip"
+        subprocess.run([sys.executable, str(SCRIPTS / "pack_miniapp.py"), str(cloud_root),
+                        "-o", str(archive)], check=True, capture_output=True)
+        with zipfile.ZipFile(archive) as package:
+            manifest = json.loads(package.read("manifest.json"))
+            self.assertEqual(set(manifest["permissions"]), {"ui", "storage", "cloud"})
+            html = package.read("index.html").decode()
+            permissions = html.split("window.__antMockPermissions = ", 1)[1].split(";", 1)[0]
+            self.assertEqual(json.loads(permissions), manifest["permissions"])
+            self.assertIn("ant-mock.js", package.namelist())
 
     def test_python_service_uses_expanded_package_limits(self):
         files = [("dummy", type("Sized", (), {"stat": lambda _: type("Stat", (), {"st_size":1})()})())] * 2001

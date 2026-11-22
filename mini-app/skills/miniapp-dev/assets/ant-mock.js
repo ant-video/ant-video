@@ -12,6 +12,8 @@
  *   window.__antMockPython      = { hello: function(payload) { return {message: payload.name}; } }
  *                                // 或 function(method, args)，对接 dev_python.py
  *   window.__antMockServices    = { 'com.foo.service': 'http://127.0.0.1:3001' }
+ *   window.__antMockCloud       = { identity: async () => ({playerId:'preview-a'}) }
+ *                                // 方法结构同 ant.cloud，缺方法报 CLOUD_UNAVAILABLE；见 references/cloud.md
  *
  * 浏览器里没有宿主，所以 `ant.serve` 注册的 handler 只是挂到 `window.__antServe`
  * 上，自己在 devtools 里调它验证：
@@ -84,8 +86,24 @@
   }
   var loadingEl = null;
 
+  // 联网业务由开发者注入适配器，避免把本机假数据当作真实全网数据。
+  function cloudMethod(path) {
+    return function () {
+      var denied = need('cloud'); if (denied) return denied;
+      var owner = window.__antMockCloud;
+      var parts = path.split('.');
+      for (var i = 0; owner && i < parts.length - 1; i++) owner = owner[parts[i]];
+      var handler = owner && owner[parts[parts.length - 1]];
+      if (typeof handler !== 'function') {
+        return fail('CLOUD_UNAVAILABLE', '浏览器预览需要配置 __antMockCloud.' + path);
+      }
+      try { return Promise.resolve(handler.apply(owner, arguments)); }
+      catch (error) { return Promise.reject(error); }
+    };
+  }
+
   window.ant = {
-    version: 6,
+    version: 9,
     mock: true,
 
     invoke: function (api, params) {
@@ -106,7 +124,7 @@
           appVersionCode: 0,
           devMode: true,
           permissions: declared || [],
-          sdkVersion: 6,
+          sdkVersion: 9,
           mock: true
         });
       }
@@ -289,6 +307,26 @@
       };
       console.log('[ant.serve] 已注册处理器，devtools 里可以直接调 __antServe(...)');
       return function () { window.__antServe = null; };
+    },
+
+    cloud: {
+      call: cloudMethod('call'),
+      identity: cloudMethod('identity'),
+      storage: {
+        get: cloudMethod('storage.get'), set: cloudMethod('storage.set'),
+        getJSON: cloudMethod('storage.getJSON'), setJSON: cloudMethod('storage.setJSON'),
+        keys: cloudMethod('storage.keys'), remove: cloudMethod('storage.remove'), stat: cloudMethod('storage.stat')
+      },
+      file: {
+        read: cloudMethod('file.read'), write: cloudMethod('file.write'),
+        stat: cloudMethod('file.stat'), list: cloudMethod('file.list'), delete: cloudMethod('file.delete')
+      },
+      leaderboard: { submit: cloudMethod('leaderboard.submit'), list: cloudMethod('leaderboard.list') },
+      room: {
+        create: cloudMethod('room.create'), list: cloudMethod('room.list'),
+        join: cloudMethod('room.join'), get: cloudMethod('room.get'), leave: cloudMethod('room.leave'),
+        update: cloudMethod('room.update'), send: cloudMethod('room.send'), subscribe: cloudMethod('room.subscribe')
+      }
     },
 
     storage: {

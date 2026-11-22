@@ -130,7 +130,7 @@ Android 分区存储下拿到的路径常常读不了，那边还是用 zip。
 - **`ant.request` 隐式放行入口域名**，其余域名照旧看 `allowlist`；内网地址依然一律拒绝。
 - **代码在别人服务器上，随时会变**。宿主在小程序图标右下角标一个云角标提示用户，权限声明请按最小集写。
 - 页面里的 `fetch` / `<img>` / `<script src>` 不算导航，不受 `allowlist` 约束，跨域由浏览器的 CORS 决定；需要绕 CORS 就走 `ant.request`。
-- 站点自己的 `localStorage` / Cookie 跟着站点 origin 走，不是宿主的 `ant.storage` 分区；要跨设备或跟宿主对齐，用 `ant.storage`。
+- 站点自己的 `localStorage` / Cookie 跟着站点 origin 走。宿主的私有本地存储用 `ant.storage`，需要跨设备时用 `ant.cloud`。
 - 宿主默认对在线站点启用广告过滤：请求层拦截常见国内外广告平台及典型广告资源，页面层隐藏横幅、信息流、插屏和视频广告控件。这个能力只作用于在线站点型小程序，规则由宿主维护，小程序不能借此向第三方页面注入任意脚本；若站点被误伤，用户可在「小程序设置 → 在线网站广告过滤」关闭，结束该小程序后重新打开生效。
 
 ## 3. 权限
@@ -140,6 +140,7 @@ Android 分区存储下拿到的路径常常读不了，那边还是用 zip。
 | `ui` | `ant.ui.*`、`ant.clipboard.*` |
 | `storage` | `ant.storage.*` |
 | `filesystem` | `ant.file.*`，私有文件读写，见 4.13 |
+| `cloud` | `ant.cloud.*`，联网数据、全网排行榜和多人房间，见 4.14 |
 | `network` | `ant.request`、`ant.requestJson`、`ant.requestBytes`、`ant.requestStream`、`ant.requestSSE` |
 | `navigate` | `ant.navigateTo` / `redirectTo` / `navigateBack` / `exitMiniApp` |
 | `miniapp` | `ant.miniApp.open`（打开其它已安装小程序）、`ant.resolveService`（只解析服务地址） |
@@ -161,7 +162,7 @@ Android 分区存储下拿到的路径常常读不了，那边还是用 zip。
 ## 4. SDK 参考
 
 异步 JSAPI 返回 Promise，事件订阅/文本行解析等同步工具除外。失败时 reject 的 Error 带
-`code`（见第 7 节）与 `api` 字段。当前 ant.version 为 6，环境 sdkVersion 仍为 5；
+`code`（见第 7 节）与 `api` 字段。当前 `ant.version` 和 `sdkVersion` 均为 9。
 用具体方法是否存在判断新能力，避免只比较版本数字。
 
 ### 4.1 环境与日志
@@ -600,6 +601,118 @@ file 同样提供 stat/mkdir/rename，支持 text/base64 编码。read 直接返
 流请求需要 network 权限，句柄 Promise resolve 不代表流结束，完成由 onDone 通知；
 requestSSE 仅解析 data 行，多行事件自行合并。解析出的真实服务地址仅供当次 fetch/媒体标签使用，
 不要推导或持久化真实端口、token、Python key。
+
+### 4.14 小程序联网服务
+
+在 `manifest.json` 的 `permissions` 数组加上 `"cloud"`，宿主统一提供联网服务和玩家身份。各台设备安装相同 `appId` 的小程序后，即可访问该应用的共享数据、排行榜和联网房间。开发者通过 `ant.cloud` 调用，宿主负责认证、请求和实时订阅。
+
+包内小程序与 HTTPS 在线入口均支持。联网调用和事件限于入口同源的顶层页面。调试模式使用宿主固定的开发用 `appId`，测试数据也落在这个命名空间。
+
+#### 业务云函数
+
+SDK 9 增加 `ant.cloud.call(name, data)`，供服务端判定游戏规则等业务使用。
+
+```js
+const game = await ant.cloud.call('game', {
+  action: 'guess',
+  options: { roomId, turnId, text: '西瓜', requestId }
+});
+```
+
+业务调用由宿主为当前小程序提供，函数名、动作与返回值按对应能力的公开约定使用。
+参数须为不超过 64 KiB 的 JSON 对象，业务请求未被接受时返回 `BUSINESS_ERROR`。
+开发者只需处理 JSAPI 调用和游戏状态，无需接触宿主内部实现或部署流程。
+完整调用说明见 [联网开发参考](../skills/miniapp-dev/references/cloud.md#业务云函数与画猜计分)。
+
+#### 设备身份
+
+```js
+const { playerId } = await ant.cloud.identity();
+```
+
+`playerId` 是当前安装在此 `appId` 下的稳定玩家标识，由服务器计算。更换小程序 `appId` 会产生另一个玩家标识。排行榜成绩与房间成员的归属取自宿主会话。
+
+#### 共享配置与文件
+
+```js
+await ant.cloud.storage.setJSON('world-config', { map: 'island' });
+const config = await ant.cloud.storage.getJSON('world-config', {});
+const keys = await ant.cloud.storage.keys();
+await ant.cloud.storage.remove('old-config');
+
+// 默认 shared 范围，同一 appId 的所有设备可读写。
+await ant.cloud.file.write('maps/island.json', JSON.stringify(mapData));
+const mapText = await ant.cloud.file.read('maps/island.json');
+const files = await ant.cloud.file.list('maps');
+await ant.cloud.file.delete('maps/old.json');
+
+// private 范围按当前安装隔离。
+await ant.cloud.storage.setJSON('save', saveData, { scope: 'private' });
+const save = await ant.cloud.storage.getJSON('save', {}, { scope: 'private' });
+
+await ant.cloud.file.write('cover.png', imageBase64, { encoding: 'base64' });
+const cover = await ant.cloud.file.read('cover.png', { encoding: 'base64' });
+```
+
+`storage.stat(key, options)` 和 `file.stat(path, options)` 返回 `{ path, size, version, modifiedAt }`，缺失时返回 `null`。`file.write` 返回同样的元数据，`file.read` 返回字符串，缺失文件报 `NOT_FOUND`。`file.list` 返回文件元数据数组，传目录时列出此目录下的全部文件。
+
+多台设备编辑同一条目时，可先读取版本，在写入或删除的选项中传 `expectedVersion`。传 `0` 表示条目尚不存在。服务器在事务中检查版本，冲突时返回 `CONFLICT`。省略版本时，后完成的写入覆盖同名内容。
+
+配置键最长 256 字符，单项 256 KiB，每个应用的共享配置总计 1 MiB、最多 512 项。文件路径最长 512 字符，使用 `/` 分隔的相对路径。单文件上限 5 MiB，每个应用的共享文件总计 20 MiB、最多 512 项。每个设备的 private 范围单独计算同样的配额。云文件支持 UTF-8 文本与 Base64 二进制。
+
+#### 全网排行榜
+
+```js
+// 默认保留每个玩家的最高成绩，返回本页榜单及自己的成绩和排名。
+await ant.cloud.leaderboard.submit('season-1', 1200, {
+  name: '玩家甲',
+  data: { level: 8 }
+});
+const ranking = await ant.cloud.leaderboard.list('season-1', { limit: 20, offset: 0 });
+// { entries: [{ rank, playerId, name, score, data, updatedAt }], self, total, order }
+
+// 耗时榜在第一次提交时使用 asc，之后保留最小值。
+await ant.cloud.leaderboard.submit('race-time', 42.5, { order: 'asc', name: '玩家甲' });
+```
+
+榜单按 `appId + board` 分区，排序方向在创建后固定。每个玩家每榜一条记录，分页大小为 1–100。当前 `submit` 接收客户端上报的成绩，服务器负责身份归属、最佳成绩更新和排序。游戏的计分与胜负规则由业务实现。
+
+#### 多人房间与实时事件
+
+```js
+// 设备 A 创建房间。
+const room = await ant.cloud.room.create({
+  roomName: '双人对局', name: '玩家甲', capacity: 2,
+  state: { turn: 0, board: [] }, listed: true
+});
+
+// 设备 B 从公开列表选择房间，或通过业务分享的 roomId 加入。
+const rooms = await ant.cloud.room.list();
+const joined = await ant.cloud.room.join(roomId, { name: '玩家乙' });
+
+const unsubscribe = await ant.cloud.room.subscribe(roomId, event => {
+  if (event.type === 'snapshot') renderGame(event.room.state);
+  if (event.type === 'presence') renderPlayers(event.members);
+  if (event.type === 'message') handleMessage(event.playerId, event.data.event, event.data.data);
+  if (event.type === 'error') showError(event.message);
+}, { afterSeq: 0 });
+
+await ant.cloud.room.send(roomId, 'move', { x: 1, y: 2 });
+const current = await ant.cloud.room.get(roomId);
+await ant.cloud.room.update(roomId, nextState, current.version);
+// 返回新 room 快照，版本冲突返回 CONFLICT，业务重新读取后处理。
+
+await unsubscribe();
+await ant.cloud.room.leave(roomId);
+```
+
+房间快照包含 `id`、`name`、`hostId`、`members`、`state`、`version`、`seq` 和 `expiresAt`。`listed: false` 的房间通过 ID 加入。容量为 2–32 人，状态上限 64 KiB，单条消息数据上限 8 KiB。房间成员均可发送消息和按版本更新状态。
+
+房间事件通过实时通知触发增量读取，并每 5 秒补读和续期在线状态。订阅包含 `snapshot`、`presence`、`message`、`state`、`members` 和 `error` 事件。带 `seq` 的事件按序号递增投递，可将最后处理的序号作为 `afterSeq` 恢复。每房保留最近 256 条事件，早于保留窗口时快照带 `resync: true`，业务据此恢复当前状态。成员 90 秒无心跳后需重新加入，房间 24 小时到期，每个安装最多创建 10 个有效房间。
+
+换页、终止小程序或取消订阅时，宿主关闭相应监听与心跳。`CLOUD_FORBIDDEN` 表示设备未登记、已停用或尚未加入房间。`CLOUD_NOT_DEPLOYED` 表示宿主尚未提供所需联网能力，可联系宿主维护者。
+
+联网连接及认证由宿主管理。完整 API、配额、错误码和 mock 适配器见 [联网开发参考](../skills/miniapp-dev/references/cloud.md)。
 
 ## 5. 打包与发版
 

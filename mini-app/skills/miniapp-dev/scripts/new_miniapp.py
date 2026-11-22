@@ -26,6 +26,7 @@ KNOWN_PERMS = [
     "network",
     "storage",
     "filesystem",
+    "cloud",
     "ui",
     "navigate",
     "miniapp",

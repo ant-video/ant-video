@@ -5,6 +5,7 @@
 小程序界面是 HTML/JS/CSS，跑在宿主 WebView 里，通过 document-start 注入的 `window.ant`
 调用播放器、采集源、存储等能力；包内也能携带 Python 或 Node.js 后端。使用已支持这些能力的
 宿主无需修改 Flutter 或重新编译。Python 的函数/HTTP 服务契约见 [Python 参考](skills/miniapp-dev/references/python.md)。
+SDK 9 还提供云配置/文件、全网排行榜、多人房间及服务端业务云函数，见 [联网开发参考](skills/miniapp-dev/references/cloud.md)。
 
 ## 目录结构
 
@@ -14,7 +15,7 @@ mini-app/
 │  ├─ miniapp-developer-guide.md   开发引导：manifest、权限、JSAPI、打包发版
 │  └─ miniapp-standalone-dev.md    浏览器、Python 联调、宿主调试与安装验收
 ├─ miniapps/
-│  ├─ ant-sdk.js                   当前注入 SDK v6（环境 sdkVersion 仍为 5，优先判断方法存在）
+│  ├─ ant-sdk.js                   当前注入 SDK v9（ant.version / sdkVersion 均为 9）
 │  ├─ demo/                        覆盖全部 JSAPI 的最小示例
 │  ├─ app-launcher/                跨小程序打开的发起端
 │  ├─ launch-target/               启动参数与 onOpen 的接收端
@@ -25,12 +26,13 @@ mini-app/
 │  ├─ node-demo/                   Node.js 后端服务示例（worker_threads）
 │  ├─ python-demo/                 Python 顶层函数调用与 HTTP 服务
 │  ├─ sudugu-reader/               速读谷 Python 小说阅读器
+│  ├─ draw-guess/                  画猜俱乐部（多人你画我猜 + 服务端积分榜）
 │  ├─ tetris/                      俄罗斯方块（纯前端游戏 + TV 遥控）
 │  └─ emby/                        影视库（多页面 + 采集源 + 播放 + 续播）
 ├─ market/
 │  ├─ market.json                  市场清单，用户在宿主「市场」Tab 填它的地址
 │  └─ zip/*.zip                    各小程序的安装包
-└─ skills/miniapp-dev/             Claude Code skill：脚手架 / mock SDK / 预检 / 打包
+└─ skills/miniapp-dev/             Codex / Claude Code skill：脚手架 / mock SDK / 预检 / 打包
 ```
 
 ## 示例小程序
@@ -48,6 +50,7 @@ mini-app/
 | **[Python 示例](miniapps/python-demo/README.md)** | `com.example.python.demo` | python / ui / storage | 顶层函数 ant.python.call 直接返回 JSON，serve 提供 HTTP 服务；标准库即可本地联调 |
 | **[速读谷小说](miniapps/sudugu-reader/README.md)** | `com.leospring.sudugu_reader` | python / ui / storage | 基于附件 Python 采集脚本：分类/搜索/简介/目录、分页正文、书架、阅读进度、字号/行距/夜间配色、TV 遥控 |
 | **LogVar 弹幕服务（Node 版）** `miniapps/logvar-danmu-node/` | `com.logvar.danmu.node` | node | 真实的 Node 服务小程序：把上游 danmu_api 打成单个 CJS bundle 跑在宿主内嵌 node 里。目录内是宿主适配层与构建脚本，业务源码来自上游 checkout（AGPL-3.0） |
+| **[画猜俱乐部](miniapps/draw-guess/README.md)** | `com.leospring.drawguess` | cloud / storage / ui / navigate | 2–8 人实时你画我猜，选词作画、猜词计分、重进恢复及全网累计积分榜；需要提供画猜联网能力的 SDK 9 宿主 |
 | **俄罗斯方块** `miniapps/tetris/` | `com.leospring.tetris` | ui / storage / navigate | 掌机复刻，Web Audio 音效 + LCD 光影；自带 `ant-mock.js`，浏览器里直接能玩 |
 | **影视库** `miniapps/emby/` | `com.leospring.emby` | ui / storage / navigate / player / source | Emby 风格四页面（首页 / 媒体库 / 搜索 / 详情），复用宿主已配置的采集源，续播记录存 `ant.storage` |
 
@@ -184,6 +187,7 @@ ant.resolveService('miniapp://com.example.service/path')                        
 ant.python.call('hello', ...jsonArgs)                                                    [python]
 ant.file.write/read/stat/list/mkdir/rename/delete()                                     [filesystem]
 ant.storage.get/set/getJSON/setJSON/remove/clear/keys()                                 [storage]
+ant.cloud.call(name,data) · identity() · storage.* · file.* · leaderboard.* · room.*     [cloud]
 ant.ui.toast/loading/hideLoading/confirm({title,content})/actionSheet([...])             [ui]
 ant.clipboard.get/set(text)                                                             [ui]
 ant.navigateTo/redirectTo(url) · navigateBack() · exitMiniApp()                         [navigate]
@@ -206,6 +210,26 @@ GBK 网页必须走这条，缺省的 `'text'` 会让宿主按 charset 解码，
 拿到 `source.play` 的地址接 `ant.player.open()` 就是一条完整的看片链路（自动复用 M3U8 代理、
 去广告、内核切换），它返回的 `header` 可以原样传给 `player.open` 的 `headers`。
 
+## 联网数据与多人游戏
+
+manifest 声明 `cloud` 后，宿主统一提供联网服务和玩家身份，
+同一 appId 的设备可共享配置/文件、查询排行榜和加入联网房间，无需配对同步密钥。
+`scope: 'private'` 的云数据按安装隔离，玩家身份也按安装区分。
+
+通用排行榜接受客户端成绩。画猜等需要隐藏答案、验证回合和服务端计分的游戏，
+使用 SDK 9 的 `ant.cloud.call(name, data)` 调用宿主为当前小程序提供的业务能力。
+浏览器 mock 通过 `window.__antMockCloud` 接入适配器。完整签名、配额、断线恢复、
+业务调用和双设备验收见 [联网开发参考](skills/miniapp-dev/references/cloud.md)。
+
+### 画猜俱乐部
+
+[下载画猜安装包](market/zip/draw-guess-v1.zip)，在支持 SDK 9 的宿主导入后，
+创建画室并将六位房间号分享给朋友。支持 2–8 人轮流作画、实时猜词、撤销/清空、
+断线重进和累计积分榜。答案、回合权限与积分由服务器管理。
+
+[源码与玩法](miniapps/draw-guess/README.md)。游戏直接使用宿主提供的联网能力，
+开发与安装无需另行部署服务。
+
 ## Python 示例与小说阅读器
 
 - [安装速读谷小说](market/zip/sudugu-reader-v1.zip)：导入后即可打开书城，无需外部部署或宿主采集源。
@@ -224,7 +248,8 @@ Python 后端需要 `python` 权限与 `python.entry`，与 node 块互斥；HTT
 Android 需 ARM 设备，其它平台也需带完整 Python 运行时的宿主构建。最终导入 zip 验证内嵌执行。
 
 ```bash
-python3 skills/miniapp-dev/scripts/test_tooling.py
+python3 -B skills/miniapp-dev/scripts/test_tooling.py
+node --test skills/miniapp-dev/scripts/test_mock.cjs
 /tmp/ant-miniapp-dev/bin/python test/python_sudugu_reader_test.py
 ```
 
@@ -343,7 +368,8 @@ WebView 直接开这个地址，SDK 照旧注入。装法是「+ → 从链接�
 
 `skills/miniapp-dev/` 是自带资料的 skill，脚手架/预检/打包仅需 python3 标准库；Python 本地业务
 联调还需安装所用依赖，不需要 Flutter 或宿主源码。可装进 Codex skills，或拷到
-`~/.claude/skills/` / 项目的 `.claude/skills/`。触发词覆盖「小程序 / miniapp」、JSAPI 名和错误码。
+`~/.claude/skills/` / 项目的 `.claude/skills/`。仓库内 `.claude/skills/miniapp-dev/` 与
+公开分发目录保持一致。触发词覆盖「小程序 / miniapp」、联网游戏、排行榜、JSAPI 名和错误码。
 
 ```
 skills/miniapp-dev/
@@ -352,17 +378,20 @@ skills/miniapp-dev/
 ├─ references/jsapi.md         完整 JSAPI 参考：manifest 全字段、权限、签名与返回结构、
 │                              事件表、错误码表、硬限制、完整看片链路示例
 ├─ references/python.md        Python 函数/HTTP/WSGI、依赖与平台、小说采集适配
+├─ references/cloud.md         SDK 9 联网数据、房间恢复、业务云函数与服务端计分
 ├─ assets/ant-mock.js          浏览器 mock SDK（检测到真 SDK 自动退让，打包时留着无害）
 ├─ assets/template/            手写时的起点模板
 └─ scripts/
    ├─ new_miniapp.py           脚手架
    ├─ dev_python.py            HTML + Python 本机联调
    ├─ test_tooling.py          标准库即可运行的脚手架与打包行为测试
+   ├─ test_mock.cjs            Node.js 内置测试器验证云适配器、权限与订阅取消
    ├─ check_miniapp.py         预检（安装约束 + 后端声明 + 权限反查）
    └─ pack_miniapp.py          打包（python zipfile，保证 manifest 落在包根）
 ```
 
-> 宿主的 `ant-sdk.js` 加了新 API 时，同步更新 skill 的 `assets/ant-mock.js`、`references/jsapi.md`，
+> 宿主的 `ant-sdk.js` 加了新 API 时，同步更新公开 SDK、skill 的 `assets/ant-mock.js`、`references/jsapi.md`
+> 及对应专题参考（如 `references/cloud.md`），
 > 以及两个脚本里的权限表 —— `scripts/check_miniapp.py` 的 `KNOWN_PERMS` 与 `PERM_OF`、
 > `scripts/new_miniapp.py` 的 `KNOWN_PERMS`。加新权限时别漏 `new_miniapp.py`，
 > 不然 `--permissions` 会拒掉它。
@@ -374,5 +403,6 @@ skills/miniapp-dev/
 | [开发引导](docs/miniapp-developer-guide.md) | 写第一个小程序，或要查 manifest 字段、权限、某个 API 的确切签名、错误码 |
 | [脱离宿主开发调试](docs/miniapp-standalone-dev.md) | 配开发环境，或 CORS / 白屏 / 手机连不上 dev server / Vue-React 构建配置卡住了 |
 | [JSAPI 参考](skills/miniapp-dev/references/jsapi.md) | 只想要一份速查表，或不在宿主仓库里 |
+| [联网开发参考](skills/miniapp-dev/references/cloud.md) | 云数据、排行榜、多人房间、业务云函数、画猜计分与 mock 联调 |
 
 关注频道：[Ant Video](https://t.me/ant_video)

@@ -45,7 +45,7 @@ method 是入口 `.py` 里的可调用顶层名字，参数按位置传递；不
 显示可重试提示。直接抛异常时 JSAPI 通常只给通用 `PYTHON_CALL_FAILED`，具体原因看宿主日志。
 宿主 callApp 接收超时为 30 秒；把网络请求设为有界超时，分批读取目录或正文。
 
-当前 SDK `ant.version` 为 6，环境信息 `sdkVersion` 为 5；这两个字段尚未对齐。
+当前 SDK `ant.version` 与环境信息 `sdkVersion` 均为 9。
 判断具体功能时检查方法存在，不能仅凭数字声称支持 Python。
 
 ## 3. HTTP 服务的两种出口

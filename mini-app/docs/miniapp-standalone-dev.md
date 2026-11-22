@@ -53,6 +53,10 @@ npx vite            # 有构建流程时
 new_miniapp.py 脚手架复制。不要从旧文档粘贴过期实现；mock 已覆盖 Python 函数、流式
 网络、私有文件与服务地址映射。真 SDK 存在时自动退让。
 
+联网数据、排行榜、多人房间和业务云函数通过 `window.__antMockCloud` 适配器联调。
+mock 不会自动连接宿主联网服务，未配置的方法返回 `CLOUD_UNAVAILABLE`，详见
+[联网开发参考](../skills/miniapp-dev/references/cloud.md#浏览器联调与安装验收)。
+
 Python 本地联调用 `dev_python.py` 同时服务 HTML 和 Python；详见
 [Python 开发参考](../skills/miniapp-dev/references/python.md)。静态 http.server
 不会执行 Python，宿主 dev server 调试也不读取 manifest/Python 后端。

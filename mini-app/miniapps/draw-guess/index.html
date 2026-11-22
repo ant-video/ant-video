@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#eaf2ff" />
+    <title>画猜俱乐部</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <button class="brand" id="home-button" aria-label="返回大厅">
+          <span class="brand-mark" aria-hidden="true">✎</span
+          ><span
+            >画猜俱乐部<span class="brand-sub">你画一笔，我猜一句</span></span
+          >
+        </button>
+        <div class="top-actions">
+          <span id="network-state" role="status"><i></i>连接中</span
+          ><button
+            class="icon-button"
+            id="sound-button"
+            aria-label="开启音效"
+            title="音效"
+          >
+            ♪</button
+          ><button class="plain-button" id="ranking-button">
+            <span aria-hidden="true">♜</span> 积分榜
+          </button>
+        </div>
+      </header>
+      <main id="main">
+        <section id="lobby-view" class="lobby-view">
+          <div class="welcome">
+            <div class="welcome-copy">
+              <h1>画得随意，<br />猜得开心。</h1>
+              <p>一块画板，一群脑洞大开的朋友。<br />从你的第一笔开始。</p>
+              <div class="welcome-pencils" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </div>
+            </div>
+            <div class="entry-panel">
+              <div class="profile-row">
+                <button
+                  id="avatar-button"
+                  class="avatar profile-avatar"
+                  aria-label="更换头像"
+                >
+                  🐸</button
+                ><label class="name-field"
+                  >你的昵称<input
+                    id="nickname"
+                    maxlength="16"
+                    placeholder="给自己起个名字"
+                    autocomplete="nickname"
+                /></label>
+              </div>
+              <button id="create-button" class="primary-button large-button">
+                <span aria-hidden="true">＋</span> 创建画室
+              </button>
+              <div class="join-divider">已有房间号？</div>
+              <form id="join-form" class="join-form">
+                <input
+                  id="room-code"
+                  aria-label="六位房间号"
+                  placeholder="输入 6 位房间号"
+                  inputmode="numeric"
+                  pattern="[0-9]{6}"
+                  maxlength="6"
+                  autocomplete="off"
+                /><button class="secondary-button" type="submit">加入</button>
+              </form>
+              <button id="practice-button" class="text-button">
+                先随手画一画 <span aria-hidden="true">↗</span>
+              </button>
+            </div>
+          </div>
+          <div class="rooms-heading">
+            <div>
+              <h2>正在热闹的画室</h2>
+              <p>加入一个房间，认识新的画友</p>
+            </div>
+            <button id="refresh-rooms" class="text-button">↻ 刷新</button>
+          </div>
+          <div id="rooms-list" class="rooms-list" aria-live="polite"></div>
+          <div class="how-to">
+            <span><b>✎</b> 轮流当画手</span><span><b>?</b> 看画猜词语</span
+            ><span><b>★</b> 猜对得积分</span
+            ><span class="rules-note">2–8 人一起玩，猜得越快积分越多</span>
+          </div>
+        </section>
+        <section id="game-view" class="game-view" hidden>
+          <div class="room-bar">
+            <div>
+              <button
+                id="leave-button"
+                class="icon-button back-button"
+                aria-label="离开房间"
+              >
+                ‹
+              </button>
+              <div class="room-title">
+                <h1 id="room-title">自由练习</h1>
+                <button
+                  id="copy-room"
+                  class="room-code-button"
+                  title="复制房间号"
+                ></button>
+              </div>
+            </div>
+            <span id="round-label" class="round-label"></span>
+          </div>
+          <div class="game-grid">
+            <aside class="players-panel">
+              <div class="panel-heading">
+                <h2>画友们 <span id="player-count"></span></h2>
+                <span class="little-star" aria-hidden="true">✳</span>
+              </div>
+              <div id="players-list"></div>
+              <div class="room-rules" id="room-rules"></div>
+            </aside>
+            <div class="drawing-column">
+              <div class="turn-bar">
+                <div>
+                  <span id="turn-label">你的画板</span
+                  ><strong id="word-hint">随手画一画</strong>
+                </div>
+                <div id="timer" class="timer" aria-label="剩余时间">
+                  <span id="timer-number">∞</span
+                  ><small id="timer-unit">尽情画</small>
+                </div>
+              </div>
+              <div class="canvas-wrap" id="canvas-wrap">
+                <canvas
+                  id="board"
+                  width="1000"
+                  height="650"
+                  aria-label="游戏画板"
+                ></canvas>
+                <div id="board-watermark">把脑洞画在这里</div>
+                <div id="game-overlay" class="game-overlay" hidden></div>
+                <span id="brush-cursor" class="brush-cursor" hidden></span>
+              </div>
+              <div id="drawing-tools" class="drawing-tools">
+                <div class="palette" id="palette" aria-label="画笔颜色"></div>
+                <span class="tool-divider"></span
+                ><button
+                  class="tool-button active"
+                  data-width="4"
+                  aria-label="细画笔"
+                >
+                  <span class="brush-dot small-dot"></span></button
+                ><button
+                  class="tool-button"
+                  data-width="11"
+                  aria-label="粗画笔"
+                >
+                  <span class="brush-dot big-dot"></span></button
+                ><button
+                  class="tool-button"
+                  id="eraser-button"
+                  aria-label="橡皮擦"
+                >
+                  ▱</button
+                ><span class="toolbar-spacer"></span
+                ><button
+                  class="tool-button"
+                  id="undo-button"
+                  aria-label="撤销上一笔"
+                >
+                  ↶</button
+                ><button
+                  class="tool-button"
+                  id="clear-button"
+                  aria-label="清空画板"
+                >
+                  ⌫
+                </button>
+              </div>
+              <div id="canvas-message" class="canvas-message">画布已准备好</div>
+            </div>
+            <aside class="chat-panel">
+              <div class="panel-heading">
+                <h2>猜猜是什么</h2>
+                <span id="chat-status">聊聊你的灵感</span>
+              </div>
+              <div
+                id="chat-list"
+                class="chat-list"
+                role="log"
+                aria-label="猜词记录"
+              ></div>
+              <form id="guess-form" class="guess-form">
+                <input
+                  id="guess-input"
+                  maxlength="40"
+                  placeholder="输入你的答案…"
+                  autocomplete="off"
+                  enterkeyhint="send"
+                /><button
+                  type="submit"
+                  class="send-button"
+                  aria-label="发送答案"
+                >
+                  ↑
+                </button>
+              </form>
+            </aside>
+          </div>
+        </section>
+        <section id="ranking-view" class="ranking-view" hidden>
+          <div class="ranking-heading">
+            <button id="ranking-back" class="icon-button" aria-label="返回">
+              ‹
+            </button>
+            <div>
+              <h1>灵魂画手榜</h1>
+              <p>每一次灵光一现，都值得一个好名次。</p>
+            </div>
+            <span class="ranking-star" aria-hidden="true">★</span>
+          </div>
+          <div id="ranking-list"></div>
+          <div id="my-ranking"></div>
+        </section>
+      </main>
+      <footer id="app-footer">
+        <span>不必画得好，只管脑洞大。</span><span>画猜俱乐部</span>
+      </footer>
+    </div>
+    <dialog id="create-dialog">
+      <form id="create-form">
+        <div class="dialog-heading">
+          <h2>开一间画室</h2>
+          <button
+            type="button"
+            class="icon-button close-dialog"
+            aria-label="关闭"
+          >
+            ×
+          </button>
+        </div>
+        <label
+          >画室名称<input
+            id="new-room-name"
+            maxlength="32"
+            placeholder="给这个画室起个名字" /></label
+        ><label
+          >每轮画画时间<select id="duration">
+            <option value="60">60 秒，灵感快闪</option>
+            <option value="75" selected>75 秒，刚刚好</option>
+            <option value="90">90 秒，慢慢画</option>
+          </select></label
+        >
+        <div class="field-pair">
+          <label
+            >人数上限<select id="capacity">
+              <option value="4">4 人</option>
+              <option value="6" selected>6 人</option>
+              <option value="8">8 人</option>
+            </select></label
+          ><label
+            >每人画几次<select id="cycles">
+              <option value="1">1 次</option>
+              <option value="2">2 次</option>
+            </select></label
+          >
+        </div>
+        <label class="checkbox-label"
+          ><input
+            type="checkbox"
+            id="listed"
+            checked
+          />在大厅展示，让更多画友加入</label
+        ><button class="primary-button large-button" type="submit">
+          创建画室
+        </button>
+      </form>
+    </dialog>
+    <dialog id="confirm-dialog">
+      <form method="dialog">
+        <h2 id="confirm-title">离开画室？</h2>
+        <p id="confirm-copy">可以用房间号重新加入。</p>
+        <div class="dialog-actions">
+          <button class="secondary-button" value="cancel">留下</button
+          ><button class="primary-button" value="confirm">确定</button>
+        </div>
+      </form>
+    </dialog>
+    <div id="toast" class="toast" role="status" hidden></div>
+    <div id="celebration" class="celebration" aria-hidden="true"></div>
+    <script src="./app.js"></script>
+  </body>
+</html>

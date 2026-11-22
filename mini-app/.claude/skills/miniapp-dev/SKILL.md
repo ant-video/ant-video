@@ -1,6 +1,6 @@
 ---
 name: miniapp-dev
-description: 为蚂蚁影视开发、调试、校验和打包 WebView 小程序，支持 HTML/JS/CSS、包内 Python 或 Node.js 后端、小说阅读、流式请求、私有文件及在线站点。适用于 manifest、ant JSAPI、TV 遥控和安装运行问题；不用于修改 Flutter 宿主功能。
+description: 为蚂蚁影视开发、调试、校验和打包 WebView 小程序，支持 HTML/JS/CSS、包内 Python 或 Node.js 后端、小说阅读、流式请求、私有文件、在线站点，以及 cloud 联网数据、排行榜、多人房间和业务云函数。适用于 manifest、ant JSAPI、TV 遥控和安装运行问题；不用于修改 Flutter 宿主功能。
 ---
 
 # 小程序开发（flutter_ant_video 宿主）
@@ -8,6 +8,8 @@ description: 为蚂蚁影视开发、调试、校验和打包 WebView 小程序�
 小程序界面是 HTML/JS/CSS，跑在宿主 WebView 里，通过 document-start 注入的 `window.ant`
 调用宿主能力；包内还可携带 Python 或 Node.js 后端。已支持这些能力的宿主无需修改 Flutter
 或重新编译。创建 Python 小程序时先读 [references/python.md](references/python.md)。
+联网交互、跨设备数据、排行榜与多人游戏先读 [references/cloud.md](references/cloud.md)，
+其中包含 SDK 9 签名、房间恢复、服务端计分和浏览器适配器。
 
 ## 动手前确认三件事
 
@@ -31,6 +33,9 @@ SKILL=/absolute/path/to/miniapp-dev
 只有两处需要宿主仓库：第 6 节（做成内置小程序）和文末列的宿主源码/文档（可选的加深阅读）。
 不在宿主仓库里时跳过它们，其余流程完全不受影响。
 
+公开分发内容限于小程序源码、安装包、公开 JSAPI 和开发工具。宿主内部数据库、业务实现、
+部署脚本及运维资料保留在宿主项目中，不复制到公开仓库或安装包。
+
 ## 1. 脚手架
 
 ```bash
@@ -40,7 +45,7 @@ python3 "$SKILL/scripts/new_miniapp.py" \
 
 生成 `manifest.json` / `index.html` / `app.js` / `style.css` / `ant-mock.js`，硬规则（相对路径、
 `body` 背景、安全区、深色模式、TV 遥控焦点、mock 权限自检）已经预置好，直接往上写业务。
-`--permissions ui,storage,filesystem,network,player,source,navigate,miniapp,service,node,python` 可指定
+`--permissions ui,storage,filesystem,cloud,network,player,source,navigate,miniapp,service,node,python` 可指定
 权限，缺省 `ui,storage`；`--node` 生成 Node 服务（见 7.3）；`--python` 生成 `app.py`、Python
 声明和 `ant.python.call` 示例（见 7.4）。两种后端互斥。
 
@@ -57,6 +62,9 @@ cd miniapps/notes && python3 -m http.server 3000   # 必须走 HTTP，不能 fil
 `ant-mock.js` 在浏览器里补齐 `window.ant`（toast/storage/player 都有极简实现），进了宿主检测到真
 SDK 会自动退让，所以**打包时留着无害**。采集源没法模拟，在 `index.html` 里用
 `window.__antMockFixtures` 喂假数据；`window.__antMockPermissions` 要和 manifest 保持一致。
+
+联网 mock 通过 `window.__antMockCloud` 接入业务适配器，未配置的方法报 `CLOUD_UNAVAILABLE`。
+它不会自动连接宿主联网服务，联调方法见 [联网参考](references/cloud.md#浏览器联调与安装验收)。
 
 唯一硬伤：mock 的 `ant.request` 走 `fetch`，**受 CORS 限制**，真机不受限。优先用假数据绕开。
 
@@ -75,6 +83,9 @@ SDK 会自动退让，所以**打包时留着无害**。采集源没法模拟，
 `[ERR]`，可全部复制——真机上先看它。调试实例的日志强制可见；正式安装的实例要先在小程序中心
 右上角「调试」里打开调试功能开关（下次启动生效）。要用完整 DevTools：Android 走
 `chrome://inspect`，iOS/macOS 走 Safari 开发菜单，且**只有 debug 构建能 inspect**。
+
+联网调试使用固定 appId `dev.playground`。正式 appId 的云函数需导入安装包验收，
+详见 [联网参考](references/cloud.md#接入与身份)。
 
 **调试模式权限全开且完全不读 manifest**，所以它验证不了权限声明和安装校验——这两项靠第 5 节的预检。
 
@@ -131,6 +142,14 @@ WebView 直接开这个地址，SDK 照旧在 document-start 注入。
 - 宿主默认启用两层广告过滤：请求层拦常见广告厂商/资源 URL，页面层隐藏横幅、信息流、插屏
   和视频广告控件。误伤时让用户在「小程序设置 → 在线网站广告过滤」关闭，结束实例后重开生效
 
+### 4.2 联网数据、房间与积分榜
+
+manifest 声明 `cloud`，宿主统一提供联网服务和玩家身份，无需用户配对同步密钥。
+共享配置和文件用 `ant.cloud.storage/file`，安装私有数据传 `{ scope: 'private' }`。
+通用排行榜用 `ant.cloud.leaderboard`，多人状态和事件用 `ant.cloud.room`。
+需要隐藏答案、验证动作或服务端计分时，用 SDK 9 的 `ant.cloud.call` 调用宿主提供的业务能力。
+完整签名、配额、断线恢复、业务调用及双设备验收见 [references/cloud.md](references/cloud.md)。
+
 ## 5. 阶段③ 预检 + 打包
 
 ```bash
@@ -179,6 +198,7 @@ ant.requestStream({url,onHeaders,onData,onError,onDone,onAbort})                
 ant.requestSSE(options, onDataLine) · readLines(onLine) // SSE data 行 / 分块行解析
 ant.resolveService('miniapp://com.example.service/path')                         [miniapp]
 ant.storage.get/set/getJSON/setJSON/remove/clear/keys()                          [storage]
+ant.cloud.call(name, data) / identity() / storage.* / file.* / leaderboard.* / room.* [cloud]
 ant.file.write/read/stat/list/mkdir/rename/delete()                              [filesystem]
 ant.python.call('functionName', ...jsonArgs)                                      [python]
 ant.ui.toast/loading/hideLoading/confirm({title,content})/actionSheet([...])     [ui]
@@ -194,7 +214,7 @@ ant.on/off/once(event, fn) · onShow(fn) · onHide(fn) · tv.onKey(fn)
 ```
 
 事件：`app.show`、`app.hide`、`miniApp.open`、`player.open`、`player.stateChange`、`player.close`、`keydown`、`request.stream`。
-能力判断优先检查方法存在；当前 SDK `ant.version` 为 6，宿主环境字段仍报 `sdkVersion: 5`，
+能力判断优先检查方法存在；当前 SDK `ant.version` 与宿主环境字段 `sdkVersion` 均为 9，
 不要只靠数字判断 Python、文件或流式 API。`ant.request` 可直接请求 `miniapp://`；原生 fetch
 或媒体标签先用 `ant.resolveService`，解析出的实际地址不要持久化。
 `ant.player.open` 的 `headers` 是取流请求头（`source.play` 返回的 `header` 可原样传，单数也认，

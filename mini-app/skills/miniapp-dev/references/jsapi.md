@@ -1,19 +1,21 @@
-# ant JSAPI 参考（当前 SDK v6）
+# ant JSAPI 参考（当前 SDK v9）
 
 本文件是 skill 自带的完整参考，**不依赖宿主仓库**。在宿主仓库里工作时可以额外读
 `docs/miniapp/` 下的三篇文档（更细，含技术设计与实战示例），行为有疑问时以宿主的
 `assets/miniapp/ant-sdk.js` 与 `lib/miniapp/bridge/` 为准。
 
-当前 `ant.version` 是 6，宿主 `getSystemInfo().sdkVersion` 仍为 5；优先检查具体方法是否存在。
+当前 `ant.version` 与宿主 `getSystemInfo().sdkVersion` 均为 9；优先检查具体方法是否存在。
 老宿主上新增方法可能是 undefined 或返回 UNKNOWN_API。Python 后端详细说明见
-[python.md](python.md)，需要时再读。
+[python.md](python.md)，联网数据、房间和业务云函数见 [cloud.md](cloud.md)。
 
 | 版本 | 新增 |
 |---|---|
 | v2 | `ant.request` 的 `responseType` / `followRedirects`、`ant.requestBytes`、`ant.base64ToBytes`、`ant.serve` 与 `service` 权限 |
 | v3 | `ant.miniApp.open` / `getLaunchOptions` / `onOpen` 与 `miniapp` 权限 |
 | v4 | `ant.player.open` 收 `sniff` 与 `source.play` 的解析字段：`parse`/`jx` 为 `'1'` 的线路能交给宿主嗅探 |
-| 当前版本 | `ant.python.call`、python 服务块、`ant.file` 与 filesystem 权限、`ant.requestStream/requestSSE/readLines`、`ant.resolveService` |
+| v6 | `ant.python.call`、python 服务块、`ant.file` 与 filesystem 权限、`ant.requestStream/requestSSE/readLines`、`ant.resolveService` |
+| v8 | `ant.cloud.identity/storage/file/leaderboard/room` 与 `cloud` 权限 |
+| v9 | `ant.cloud.call(name, data)`，宿主提供的业务能力 |
 
 ## manifest.json
 
@@ -52,6 +54,7 @@
 | `ui` | `ant.ui.*`、`ant.clipboard.*` |
 | `storage` | `ant.storage.*` |
 | `filesystem` | `ant.file.*` |
+| `cloud` | `ant.cloud.*`，联网数据、排行榜、房间及业务云函数，见 [cloud.md](cloud.md) |
 | `network` | `ant.request`、`ant.requestJson`、`ant.requestBytes`、`ant.requestStream`、`ant.requestSSE` |
 | `miniapp` | `ant.miniApp.open`、`ant.resolveService`（接收启动参数不需权限） |
 | `python` | `ant.python.call` 与 manifest.python 本地后端 |
@@ -459,7 +462,10 @@ try { await ant.request({ url: '...' }); } catch (e) { console.log(e.code, e.mes
 | `HOST_NOT_ALLOWED` | 域名不在 `network.allowlist` 里 | 补白名单 |
 | `REQUEST_FAILED` | 网络层失败（超时、DNS、连接） | 重试或检查地址 |
 | `RESPONSE_TOO_LARGE` | 响应超过 10MB | 分页拉取 |
-| `QUOTA_EXCEEDED` | `ant.storage` 超 5MB | 清理旧数据 |
+| `QUOTA_EXCEEDED` | 本地存储、云数据或房间/订阅超过配额 | 清理旧数据或释放房间/订阅 |
+| `CONFLICT` | 云条目或房间版本冲突 | 重读当前版本后合并 |
+| `BUSINESS_ERROR` | 业务请求未被接受 | 展示业务提示，核对调用名称、参数及当前状态 |
+| `CLOUD_*` / `ENTRY_TOO_LARGE` | 联网配置、认证、传输或数据大小错误 | 见 [联网错误处理](cloud.md#错误处理) |
 | `INVALID_PATH` / `NOT_FOUND` / `FILE_TOO_LARGE` | 私有文件路径非法、不存在或大于 5MB | 使用相对路径、检查存在并分批存文件 |
 | `ALREADY_EXISTS` | 文件重命名目标存在 | 显式 overwrite 或先清理；删除非空目录时明确 recursive |
 | `PYTHON_ENTRY_MISSING` / `PYTHON_RUNTIME_UNAVAILABLE` / `PYTHON_CALL_FAILED` | Python 声明、运行时或调用失败 | 见 python.md |
@@ -524,6 +530,7 @@ zip 传到任何能直链下载的地方，再给一个 JSON 列表地址，用�
 | 权限门禁 | 只在配了 `__antMockPermissions` 时检查 | 始终按 manifest 检查 |
 | `ant.storage` | `localStorage` | 文件，5MB 配额 |
 | `ant.file` | 独立 localStorage 模拟文件，仅验证交互 | 宿主私有文件目录、路径/配额校验 |
+| `ant.cloud.*` | 转发到 `__antMockCloud`，缺方法报 CLOUD_UNAVAILABLE | 宿主联网服务、玩家身份及实时房间 |
 | `ant.python.call` | __antMockPython 假函数，或 dev_python.py 转发本机 Python | 包内入口 + 内嵌 CPython；dev server 调试不加载后端 |
 | `ant.requestStream/requestSSE` | fetch + ReadableStream，受 CORS 限制 | 宿主消费流，增量通过 request.stream 事件推回 |
 | `ant.resolveService` | __antMockServices 映射 | 自动加载已安装服务并返回注册端点 |
@@ -538,6 +545,11 @@ zip 传到任何能直链下载的地方，再给一个 JSON 列表地址，用�
 | TV 按键 | 真键盘 | 遥控器，只转发 5 个键 |
 | 背景色 | 浏览器白底 | **WebView 透明**，不设 `body` 背景会透出宿主背景图 |
 
+## 联网与业务云函数（SDK 9）
 
+manifest 声明 `cloud`。`ant.cloud.identity()` 提供设备玩家身份，`storage/file` 提供默认共享、
+可选安装私有的数据，`leaderboard.submit/list` 提供通用排行榜，`room` 提供多人状态和事件。
+`ant.cloud.call(name, data)` 调用宿主为当前小程序提供的业务能力，支持隐藏答案和权威计分。
 
-
+完整方法签名、参数/返回结构、配额、订阅生命周期、事件恢复、业务调用、mock 适配器
+及双设备验收见 [cloud.md](cloud.md)。该参考可随 skill 独立使用。

@@ -118,6 +118,17 @@
       "description": "把宿主里已配置的采集源（含爬虫源）暴露为 T4 兼容服务，详情与播放由宿主解析，页面直接给出内部与局域网的 config 地址"
     },
     {
+      "appId": "com.leospring.drawguess",
+      "name": "画猜俱乐部",
+      "version": "1.0.0",
+      "versionCode": 1,
+      "url": "https://ghfast.top/https://raw.githubusercontent.com/ant-video/ant-video/refs/heads/main/mini-app/market/zip/draw-guess-v1.zip",
+      "md5": "307a1c3b3600d93ce93e9ac9c26ff98b",
+      "size": 279317,
+      "author": "leospring",
+      "description": "2–8 人联网你画我猜，轮流作画、实时猜词、重进恢复和全网累计积分榜。需要提供画猜联网能力的 SDK 9 宿主，安装即可使用。"
+    },
+    {
       "appId": "com.leospring.tetris",
       "name": "俄罗斯方块",
       "version": "1.0.0",

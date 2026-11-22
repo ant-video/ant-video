@@ -13,6 +13,9 @@
   var seq = 0;
   var listeners = {};
   var miniAppLaunchOptions = null;
+  var cloudToken = typeof __antCloudContext !== 'undefined' &&
+    window.top === window && window.location.origin === __antCloudContext.origin
+    ? __antCloudContext.token : null;
 
   function bridgeReady() {
     return new Promise(function (resolve) {
@@ -34,11 +37,15 @@
     var callId = ++seq;
     return bridgeReady()
       .then(function () {
-        return window.flutter_inappwebview.callHandler('antInvoke', {
+        var request = {
           api: api,
           params: params || {},
           callId: callId
-        });
+        };
+        if (cloudToken && typeof api === 'string' && api.trim().indexOf('cloud.') === 0) {
+          request.cloudToken = cloudToken;
+        }
+        return window.flutter_inappwebview.callHandler('antInvoke', request);
       })
       .then(function (res) {
         if (!res || res.ok !== true) {
@@ -343,35 +350,46 @@
 
   /* ---------------- 存储 ---------------- */
 
-  var storage = {
-    get: function (key) {
-      return invoke('storage.get', { key: key });
-    },
-    set: function (key, value) {
-      return invoke('storage.set', { key: key, value: String(value) });
-    },
-    getJSON: function (key, fallback) {
-      return storage.get(key).then(function (value) {
-        if (value === null || value === undefined) return fallback;
-        try {
-          return JSON.parse(value);
-        } catch (e) {
-          return fallback;
-        }
-      });
-    },
-    setJSON: function (key, value) {
-      return storage.set(key, JSON.stringify(value));
-    },
-    remove: function (key) {
-      return invoke('storage.remove', { key: key });
-    },
-    clear: function () {
-      return invoke('storage.clear', {});
-    },
-    keys: function () {
-      return invoke('storage.keys', {});
-    }
+  function createStorageApis(prefix) {
+    var api = {
+      get: function (key, options) {
+        return invoke(prefix + '.get', { key: key, scope: options && options.scope });
+      },
+      set: function (key, value, options) {
+        return invoke(prefix + '.set', {
+          key: key, value: String(value), scope: options && options.scope,
+          expectedVersion: options && options.expectedVersion
+        });
+      },
+      getJSON: function (key, fallback, options) {
+        return api.get(key, options).then(function (value) {
+          if (value === null || value === undefined) return fallback;
+          try {
+            return JSON.parse(value);
+          } catch (e) {
+            return fallback;
+          }
+        });
+      },
+      setJSON: function (key, value, options) {
+        return api.set(key, JSON.stringify(value), options);
+      },
+      remove: function (key, options) {
+        return invoke(prefix + '.remove', {
+          key: key, scope: options && options.scope,
+          expectedVersion: options && options.expectedVersion
+        });
+      },
+      keys: function (options) {
+        return invoke(prefix + '.keys', { scope: options && options.scope });
+      }
+    };
+    return api;
+  }
+
+  var storage = createStorageApis('storage');
+  storage.clear = function () {
+    return invoke('storage.clear', {});
   };
 
   var file = {
@@ -417,6 +435,102 @@
         recursive: !!(options && options.recursive)
       });
     }
+  };
+
+  var cloud = {
+    call: function (name, data) {
+      return invoke('cloud.call', { name: name, data: data || {} });
+    },
+    identity: function () {
+      return invoke('cloud.identity', {});
+    },
+    storage: createStorageApis('cloud.storage'),
+    file: {
+      write: function (path, content, options) {
+        return invoke('cloud.file.write', {
+          path: path,
+          content: content,
+          encoding: (options && options.encoding) || 'text',
+          scope: options && options.scope,
+          expectedVersion: options && options.expectedVersion
+        });
+      },
+      read: function (path, options) {
+        return invoke('cloud.file.read', {
+          path: path,
+          encoding: (options && options.encoding) || 'text',
+          scope: options && options.scope
+        });
+      },
+      list: function (directory, options) {
+        return invoke('cloud.file.list', { path: directory || '', scope: options && options.scope });
+      },
+      stat: function (path, options) {
+        return invoke('cloud.file.stat', { path: path, scope: options && options.scope });
+      },
+      delete: function (path, options) {
+        return invoke('cloud.file.delete', {
+          path: path, scope: options && options.scope,
+          expectedVersion: options && options.expectedVersion
+        });
+      }
+    },
+    leaderboard: {
+      submit: function (board, score, options) {
+        var opts = options || {};
+        return invoke('cloud.leaderboard.submit', {
+          board: board, score: score, name: opts.name, data: opts.data, order: opts.order
+        });
+      },
+      list: function (board, options) {
+        var opts = options || {};
+        return invoke('cloud.leaderboard.list', { board: board, limit: opts.limit, offset: opts.offset });
+      }
+    },
+    room: {
+      create: function (options) {
+        return invoke('cloud.room.create', options || {});
+      },
+      list: function () {
+        return invoke('cloud.room.list', {});
+      },
+      join: function (roomId, options) {
+        return invoke('cloud.room.join', { roomId: roomId, name: options && options.name });
+      },
+      get: function (roomId) {
+        return invoke('cloud.room.get', { roomId: roomId });
+      },
+      update: function (roomId, state, expectedVersion) {
+        return invoke('cloud.room.update', { roomId: roomId, state: state, expectedVersion: expectedVersion });
+      },
+      send: function (roomId, event, data) {
+        return invoke('cloud.room.send', { roomId: roomId, event: event, data: data });
+      },
+      leave: function (roomId) {
+        return invoke('cloud.room.leave', { roomId: roomId });
+      },
+      subscribe: function (roomId, handler, options) {
+        if (typeof handler !== 'function') {
+          return Promise.reject(new Error('room.subscribe 需要事件回调'));
+        }
+        var id = 'room-' + (++seq);
+        var dispose = on('cloud.room.' + id, handler);
+        return invoke('cloud.room.subscribe', {
+          roomId: roomId, streamId: id, afterSeq: (options && options.afterSeq) || 0
+        }).then(function () {
+          return function () {
+            dispose();
+            return invoke('cloud.room.unsubscribe', { streamId: id });
+          };
+        }).catch(function (error) {
+          dispose();
+          throw error;
+        });
+      }
+    }
+  };
+  cloud.storage.stat = function (key, options) {
+    return invoke('cloud.storage.stat', { key: key, scope: options && options.scope });
   };
 
   /* ---------------- 界面 ---------------- */
@@ -603,7 +717,7 @@
 
   window.ant = {
     /** SDK 协议版本，与宿主 env.getSystemInfo().sdkVersion 对应。 */
-    version: 6,
+    version: 9,
     invoke: invoke,
     on: on,
     off: off,
@@ -623,6 +737,7 @@
     serve: serve,
     storage: storage,
     file: file,
+    cloud: cloud,
     ui: ui,
     miniApp: miniApp,
     clipboard: clipboard,

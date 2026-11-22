@@ -1,0 +1,10 @@
+{
+  "appId": "com.leospring.drawguess",
+  "name": "画猜俱乐部",
+  "version": "1.0.0",
+  "versionCode": 1,
+  "renderer": "webview",
+  "entry": "index.html",
+  "description": "你来画，我来猜。多人实时画画猜词，轮流作画，争夺全网积分榜。",
+  "permissions": ["cloud", "storage", "ui", "navigate"]
+}
