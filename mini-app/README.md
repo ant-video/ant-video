@@ -242,15 +242,15 @@ manifest 声明 `cloud` 后，宿主统一提供联网服务和玩家身份，
 
 ### 好友对战小游戏
 
-以下小程序都支持房间码邀请、断线续局、独立好友榜和电视遥控器。联网时使用已开通小程序联网能力的 SDK 8 或更高版本宿主，两端安装同一个小程序即可约战。
+以下小程序的新建房间会出现在联机大厅。玩家可直接点击「加入」，也可以输入 4 位房间码。五款都支持续局、独立好友榜和电视遥控器。联网时使用已开通小程序联网能力的 SDK 8 或更高版本宿主，两端安装同一个小程序即可约战。
 
 | 小程序 | 安装包 |
 |---|---|
-| 落子五子棋 | [gomoku-v2.zip](market/zip/gomoku-v2.zip) |
-| 24点对决 | [twenty-four-v1.zip](market/zip/twenty-four-v1.zip) |
-| 数独竞速 | [sudoku-v1.zip](market/zip/sudoku-v1.zip) |
-| 楚河象棋 | [xiangqi-v1.zip](market/zip/xiangqi-v1.zip) |
-| 黑八球房 | [eight-ball-v1.zip](market/zip/eight-ball-v1.zip) |
+| 落子五子棋 | [gomoku-v3.zip](market/zip/gomoku-v3.zip) |
+| 24点对决 | [twenty-four-v2.zip](market/zip/twenty-four-v2.zip) |
+| 数独竞速 | [sudoku-v2.zip](market/zip/sudoku-v2.zip) |
+| 楚河象棋 | [xiangqi-v2.zip](market/zip/xiangqi-v2.zip) |
+| 黑八球房 | [eight-ball-v2.zip](market/zip/eight-ball-v2.zip) |
 
 ## Python 示例与小说阅读器
 

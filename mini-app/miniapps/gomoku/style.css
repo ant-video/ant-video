@@ -230,3 +230,12 @@ h1 { font: 700 clamp(31px, 5vw, 48px)/1.15 var(--serif); letter-spacing: .045em;
   .ranking-panel th, .ranking-panel td { padding: 10px 8px; }
   .table-optional { display: none; }
 }
+
+.public-rooms { margin-top: 14px; padding: 14px; background: var(--sheet, var(--surface)); border: 1px solid var(--line); border-radius: 12px; }
+.public-rooms-heading, #room-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.public-rooms-heading h2 { font-size: 16px; }
+#room-list { list-style: none; margin: 0; padding: 0; }
+#room-list li { margin-top: 8px; padding: 7px 9px; background: var(--inset); border-radius: 7px; }
+#room-list li span { overflow-wrap: anywhere; }
+#rooms-status { margin-top: 8px; color: var(--muted); }
+#rooms-status:empty { display: none; }

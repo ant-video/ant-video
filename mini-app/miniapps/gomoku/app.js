@@ -32,6 +32,7 @@
   let clockEnd = 0;
   let disconnected = false;
   let lobbyBusy = false;
+  let refreshPublicRooms;
   let gameBusy = false;
   let rankBusy = false;
   let onlineService;
@@ -303,7 +304,7 @@
       const seat = side === 1 ? game.black : game.white;
       const player = seat && profile?.playerId === seat.playerId ? profile : seat;
       const name = player ? `${player.name}${side === game.side ? '（你）' : ''}` : '等待好友';
-      const detail = player ? `执${color(side)} · ${tier(player.rating)} ${player.rating}` : '输入房间码加入';
+      const detail = player ? `执${color(side)} · ${tier(player.rating)} ${player.rating}` : '可从公开大厅加入';
       renderSeat(side, name, detail, playing && turn === side);
     }
     if (game.phase === 'waiting') {
@@ -433,7 +434,7 @@
   }
 
   function describeError(error) {
-    if (['NO_CLOUD', 'GAME_RULE', 'ROOM_UNAVAILABLE', 'BUSINESS_ERROR'].includes(error.code)) return error.message;
+    if (['NO_CLOUD', 'GAME_RULE', 'RULE', 'ROOM_UNAVAILABLE', 'BUSINESS_ERROR'].includes(error.code)) return error.message;
     if (error.code === 'CLOUD_NOT_DEPLOYED') return '当前宿主的联网服务尚未开通';
     if (error.code === 'NOT_FOUND') return '房间不存在或已到期，请核对房间码';
     if (error.code === 'QUOTA_EXCEEDED') return '已达到宿主的房间配额，请待旧房间到期后重试';
@@ -567,7 +568,7 @@
       await work();
       lobbyMessage('', false);
     } catch (error) {
-      lobbyMessage(describeError(error), !['GAME_RULE', 'NOT_FOUND'].includes(error.code));
+      lobbyMessage(describeError(error), !['GAME_RULE', 'RULE', 'NOT_FOUND'].includes(error.code));
     } finally {
       buttons.forEach((button) => { button.disabled = false; });
       lobbyBusy = false;
@@ -599,7 +600,7 @@
   function enterRoom(getRoom) {
     lobbyAction(async () => {
       acceptGame(await getRoom());
-    });
+    }).then(() => refreshPublicRooms());
   }
 
   async function gameAction(change) {
@@ -713,7 +714,7 @@
     render();
     if (mode === 'online') {
       if (game) syncGame();
-      else loadLobby();
+      else { loadLobby(); refreshPublicRooms(); }
     }
     if (mode === 'ranking') loadRanking();
   }
@@ -788,6 +789,12 @@
       const side = Number(button.dataset.side);
       if (side !== practice.side) restartPractice(practice.difficulty, side);
     }));
+    const refreshRooms = window.PublicRooms.mount({
+      list: () => online().list(),
+      join: (id) => enterRoom(() => online().join(id)),
+      visible: () => currentMode === 'online' && !game,
+    });
+    refreshPublicRooms = refreshRooms;
     $('share').addEventListener('click', shareRoom);
     $('create-room').addEventListener('click', () => enterRoom(() => online().create()));
     $('join-form').addEventListener('submit', (event) => {
@@ -811,6 +818,7 @@
     $('return-lobby').addEventListener('click', () => {
       const roomId = game?.roomId;
       clearRoom();
+      refreshPublicRooms();
       if (roomId) online().leaveRoom(roomId).catch((error) => console.warn('退出棋室失败', error));
     });
     $('reload-ranking').addEventListener('click', loadRanking);
@@ -831,6 +839,7 @@
     route();
     window.addEventListener('hashchange', route);
     setInterval(() => { syncGame(); flushRank(); }, 3500);
+    setInterval(refreshPublicRooms, 5000);
     setInterval(renderClock, 240);
   }
 

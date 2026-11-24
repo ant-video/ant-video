@@ -8,11 +8,13 @@
 - **声音设置**可独立开关原创五声音阶背景音乐和落子、结算音效。背景音乐在首次交互后播放，切到后台暂停。
 - **棋盘操作**支持鼠标、触屏、键盘方向键和回车，也支持宿主 TV 遥控事件。
 
+新建房间会显示在联机大厅。其他玩家可以直接点击「加入」，也可以输入 4 位房间码。房间开局、关闭或过期后会从等待列表移除。
+
 ## 安装与联网
 
-在已开通小程序联网能力的蚂蚁影视中，打开「小程序 → + → 导入 zip 包」，选择 [gomoku-v2.zip](../../market/zip/gomoku-v2.zip)。
+在已开通小程序联网能力的蚂蚁影视中，打开「小程序 → + → 导入 zip 包」，选择 [gomoku-v3.zip](../../market/zip/gomoku-v3.zip)。
 
-版本为 1.1.0，正式应用 ID 为 `com.leospring.gomoku`，使用 SDK 8 已提供的 `ant.cloud.identity`、`ant.cloud.room`、`ant.cloud.storage` 和 `ant.cloud.leaderboard`。安装后即可使用宿主现有的联网服务。
+版本为 1.2.0，正式应用 ID 为 `com.leospring.gomoku`，使用 SDK 8 已提供的 `ant.cloud.identity`、`ant.cloud.room`、`ant.cloud.storage` 和 `ant.cloud.leaderboard`。安装后即可使用宿主现有的联网服务。
 
 房间状态保存完整落子记录，按版本提交以避免并发覆盖。成局后，由各端在读取结果时登记本机积分，再同步到通用排行榜。私有云存储用房间 ID 去重，允许重试榜单上传。这是客户端结算的休闲好友榜。房间沿用宿主的 24 小时有效期和创建配额。
 
@@ -29,5 +31,5 @@ python3 skills/miniapp-dev/scripts/check_miniapp.py miniapps/gomoku
 修改源码后可从 `mini-app` 目录重新打包。
 
 ```sh
-python3 -B skills/miniapp-dev/scripts/pack_miniapp.py miniapps/gomoku -o market/zip/gomoku-v2.zip
+python3 -B skills/miniapp-dev/scripts/pack_miniapp.py miniapps/gomoku -o market/zip/gomoku-v3.zip
 ```

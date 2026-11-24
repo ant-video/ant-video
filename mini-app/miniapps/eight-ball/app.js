@@ -20,6 +20,7 @@
   let watchEpoch = 0;
   let startingWatch = false;
   let lobbyBusy = false;
+  let refreshPublicRooms;
   let actionBusy = false;
   let rankBusy = false;
   let disconnected = false;
@@ -409,7 +410,7 @@
     });
     render();
     if (mode === 'local') startRobot();
-    if (mode === 'online') openLobby();
+    if (mode === 'online') { openLobby(); refreshPublicRooms(); }
     if (mode === 'ranking') loadRanking();
   }
 
@@ -522,6 +523,11 @@
     $('copy-code').addEventListener('click', copyCode);
     $('new-local').addEventListener('click', beginLocal);
     $('undo-local').addEventListener('click', undoLocal);
+    refreshPublicRooms = window.PublicRooms.mount({
+      list: () => cloud().list(),
+      join: (id) => lobby(async () => accept(await cloud().join(id))).then(() => refreshPublicRooms()),
+      visible: () => mode === 'online' && !room,
+    });
     $('create-room').addEventListener('click', () => lobby(async () => accept(await cloud().create())));
     $('join-form').addEventListener('submit', (event) => {
       event.preventDefault();
@@ -547,6 +553,7 @@
       clearRoom();
       cloud().leave(id).catch((error) => console.warn('退出房间失败', error));
       openLobby();
+      refreshPublicRooms();
     });
     $('reload-rank').addEventListener('click', loadRanking);
 
@@ -561,6 +568,7 @@
     window.addEventListener('hashchange', route);
     setInterval(timer, 250);
     setInterval(checkOnline, 3500);
+    setInterval(refreshPublicRooms, 5000);
   }
 
   init().catch((error) => {

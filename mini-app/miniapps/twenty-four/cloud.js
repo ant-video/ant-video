@@ -1,6 +1,8 @@
 (function (root) {
   'use strict';
 
+  const publicRooms = typeof module !== 'undefined' ? require('./lobby.js') : root.PublicRooms;
+
   const day = 86400 * 1000;
   const scope = { scope: 'private' };
   const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
@@ -25,6 +27,7 @@
 
   function connect(cloud, game, now = Date.now) {
     const tag = `${game.id}-match-v1`;
+    const catalog = publicRooms.catalog(cloud, tag, now);
     const board = `${game.id}-wins-v1`;
     const profileKey = `${game.id}-profile-v1`;
     let identity;
@@ -124,10 +127,10 @@
       return state.players.findIndex((player) => player.playerId === id);
     }
 
-    function view(room, state, id) {
+    async function view(room, state, id) {
       const side = seat(state, id);
       if (side < 0) throw failure('你不在这间房间，请返回大厅', 'ROOM_GONE');
-      return { ...state, roomId: room.id, code: codeFor(room.id), version: room.version, seq: room.seq, until: room.expiresAt + day, side };
+      return { ...state, roomId: room.id, code: state.phase === 'waiting' ? await catalog.codeFor(room.id) || codeFor(room.id) : codeFor(room.id), version: room.version, seq: room.seq, until: room.expiresAt + day, side };
     }
 
     function startRound(state) {
@@ -161,6 +164,9 @@
         if (next === state) return view(room, state, id);
         try {
           const saved = await cloud.room.update(room.id, next, room.version);
+          if (state.phase === 'waiting' && next.phase !== 'waiting') {
+            await catalog.remove(room.id).catch((error) => console.warn('更新公开大厅失败', error));
+          }
           return view(saved, stateOf(saved), id);
         } catch (error) {
           if (error.code !== 'CONFLICT') throw error;
@@ -184,12 +190,18 @@
         type: tag, phase: 'waiting', level, players: [player], scores: [0, 0], puzzles: [], results: [],
         deadline: now() + 10 * 60 * 1000, winner: null, reason: null,
       };
-      const room = await cloud.room.create({ roomName: game.title, name: player.name, capacity: 2, listed: false, state });
+      const room = await cloud.room.create({ roomName: player.name + '的房间', name: player.name, capacity: 2, listed: true, state });
+      try {
+        await catalog.publish(room.id, state.deadline);
+      } catch (error) {
+        await leave(room.id).catch((cause) => console.warn('关闭未发布房间失败', cause));
+        throw error;
+      }
       return view(room, stateOf(room), player.playerId);
     }
 
     async function join(code) {
-      const id = roomId(code);
+      const id = await catalog.resolve(code, roomId);
       const player = await roomPlayer();
       let room;
       try {
@@ -256,7 +268,7 @@
       return changeRoom(id, (state) => ({ ...state, phase: 'finished', reason: 'closed', winner: null }));
     }
 
-    return { create, join, get: changeRoom, submit, next, close, leave, profile, leaderboard, recordWin,
+    return { list: catalog.list, create, join, get: changeRoom, submit, next, close, leave, profile, leaderboard, recordWin,
       subscribe: (id, handler, afterSeq) => cloud.room.subscribe(id, handler, { afterSeq }) };
   }
 

@@ -7,9 +7,11 @@
 - **好友胜场榜**展示前 50 名。获胜端同步本场胜场，断线后可重试。同一场对局只登记一次。
 - **控制**用触屏、鼠标或宿主遥控器选择牌、运算符和按钮。刷新或重开时可恢复联网房间和当前算式。
 
+新建房间会显示在联机大厅。其他玩家可以直接点击「加入」，也可以输入 4 位房间码。房间开局、关闭或过期后会从等待列表移除。
+
 ## 安装与验证
 
-在已开通小程序联网能力的蚂蚁影视中，打开「小程序 → + → 导入 zip 包」，选择 [twenty-four-v1.zip](../../market/zip/twenty-four-v1.zip)。
+在已开通小程序联网能力的蚂蚁影视中，打开「小程序 → + → 导入 zip 包」，选择 [twenty-four-v2.zip](../../market/zip/twenty-four-v2.zip)。
 
 两端安装相同的小程序 ID `com.leospring.twentyfour`，创建房间后将房间码发给好友。应用复用 SDK 8 的房间、设备身份、私有云存储和通用排行榜，安装后即可使用宿主现有的联网服务。胜场由客户端结算，适合好友休闲对战。
 
@@ -24,5 +26,5 @@ python3 skills/miniapp-dev/scripts/check_miniapp.py miniapps/twenty-four
 修改源码后可从 `mini-app` 目录重新打包。
 
 ```sh
-python3 -B skills/miniapp-dev/scripts/pack_miniapp.py miniapps/twenty-four -o market/zip/twenty-four-v1.zip
+python3 -B skills/miniapp-dev/scripts/pack_miniapp.py miniapps/twenty-four -o market/zip/twenty-four-v2.zip
 ```

@@ -7,6 +7,7 @@
   <title>落子五子棋</title>
   <link rel="stylesheet" href="./style.css">
   <script defer src="./engine.js"></script>
+  <script defer src="./lobby.js"></script>
   <script defer src="./online.js"></script>
   <script defer src="./app.js"></script>
 </head>
@@ -108,7 +109,7 @@
           <section class="box"><h2>加入房间</h2>
             <form id="join-form" class="join-form">
               <label class="sr-only" for="join-code">好友房间码</label>
-              <input id="join-code" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="36" placeholder="粘贴房间码" required>
+              <input id="join-code" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="36" placeholder="输入 4 位房间码" required>
               <button class="primary" type="submit">加入</button>
             </form>
           </section>
@@ -123,6 +124,14 @@
         </div>
       </div>
       <div id="lobby-feedback" class="feedback" role="status" aria-live="polite" hidden><span id="lobby-message"></span><button id="retry-lobby" class="quiet-button" type="button">重试</button></div>
+      <section class="public-rooms" aria-labelledby="rooms-title">
+        <div class="public-rooms-heading">
+          <h2 id="rooms-title">公开房间</h2>
+          <button id="refresh-rooms" class="secondary" type="button">刷新</button>
+        </div>
+        <ul id="room-list"></ul>
+        <p id="rooms-status" role="status">正在读取房间…</p>
+      </section>
     </section>
 
     <section id="ranking-view" hidden aria-labelledby="ranking-title">

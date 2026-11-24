@@ -7,9 +7,11 @@
 - **休闲棋规**同一局面第三次出现时，循环中连续单方将军则将军方负，其余重复局面判和。连续 120 步未吃子判和。重复局面按这里列出的规则处理。
 - **控制**支持鼠标、触屏和宿主遥控器。电视上用方向键移动焦点，确认键选择棋子或落点。
 
+新建房间会显示在联机大厅。其他玩家可以直接点击「加入」，也可以输入 4 位房间码。房间开局、关闭或过期后会从等待列表移除。
+
 ## 安装与验证
 
-在已开通小程序联网能力的蚂蚁影视中，打开「小程序 → + → 导入 zip 包」，选择 [xiangqi-v1.zip](../../market/zip/xiangqi-v1.zip)。
+在已开通小程序联网能力的蚂蚁影视中，打开「小程序 → + → 导入 zip 包」，选择 [xiangqi-v2.zip](../../market/zip/xiangqi-v2.zip)。
 
 两端使用相同应用 ID `com.leospring.xiangqi`。房间、私有记录和胜场榜复用 SDK 8 接口。胜场由客户端结算，适合休闲好友对弈。
 
@@ -22,5 +24,5 @@ python3 skills/miniapp-dev/scripts/check_miniapp.py miniapps/xiangqi
 修改源码后可从 `mini-app` 目录重新打包。
 
 ```sh
-python3 -B skills/miniapp-dev/scripts/pack_miniapp.py miniapps/xiangqi -o market/zip/xiangqi-v1.zip
+python3 -B skills/miniapp-dev/scripts/pack_miniapp.py miniapps/xiangqi -o market/zip/xiangqi-v2.zip
 ```

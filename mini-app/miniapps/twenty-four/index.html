@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="./style.css">
   <link rel="stylesheet" href="./game.css">
   <script defer src="./engine.js"></script>
+  <script defer src="./lobby.js"></script>
   <script defer src="./cloud.js"></script>
   <script defer src="./game.js"></script>
   <script defer src="./app.js"></script>
@@ -51,7 +52,7 @@
         </section>
         <section id="waiting-card" class="waiting-card" aria-labelledby="waiting-title" hidden>
           <h2 id="waiting-title">等待好友加入</h2>
-          <p>复制房间码发给好友，对方加入后自动开局。</p>
+          <p>房间已公开。其他人加入后自动开局，也可以分享房间码。</p>
           <output id="invite-code" aria-label="房间码"></output>
           <button id="copy-code" class="primary" type="button">复制房间码</button>
         </section>
@@ -93,7 +94,7 @@
           <section class="side-card">
             <h2>加入房间</h2>
             <form id="join-form" class="inline-form">
-              <input id="join-code" aria-label="好友房间码" type="text" maxlength="36" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="粘贴房间码" required>
+              <input id="join-code" aria-label="好友房间码" type="text" maxlength="36" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="输入 4 位房间码" required>
               <button class="primary" type="submit">加入</button>
             </form>
           </section>
@@ -107,6 +108,14 @@
         </div>
       </div>
       <p id="lobby-message" class="message" role="status" hidden></p>
+      <section class="public-rooms" aria-labelledby="rooms-title">
+        <div class="public-rooms-heading">
+          <h2 id="rooms-title">公开房间</h2>
+          <button id="refresh-rooms" class="secondary" type="button">刷新</button>
+        </div>
+        <ul id="room-list"></ul>
+        <p id="rooms-status" role="status">正在读取房间…</p>
+      </section>
     </section>
     <section id="rank-view" aria-labelledby="rank-title" hidden>
       <header class="page-title">

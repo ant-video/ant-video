@@ -14,9 +14,11 @@
 - 开球后首次合法进袋的全色球或花色球确定各自球组。合法打进己方球时继续击球。白球落袋、未碰球、先碰错球、碰球后无进袋且无碰库都算犯规。
 - 清完己方球组后，用六个袋口按钮指定黑八目标。合法打入指定袋口获胜。提前打进、打错袋口，或打进黑八时同时犯规均判负。
 
+新建房间会显示在联机大厅。其他玩家可以直接点击「加入」，也可以输入 4 位房间码。房间开局、关闭或过期后会从等待列表移除。
+
 ## 安装与验证
 
-在已开通小程序联网能力的蚂蚁影视中，打开「小程序 → + → 导入 zip 包」，选择 [eight-ball-v1.zip](../../market/zip/eight-ball-v1.zip)。
+在已开通小程序联网能力的蚂蚁影视中，打开「小程序 → + → 导入 zip 包」，选择 [eight-ball-v2.zip](../../market/zip/eight-ball-v2.zip)。
 
 两端使用相同应用 ID `com.leospring.eightball`。房间、私有记录和胜场榜复用 SDK 8 接口。胜场由客户端结算。
 
@@ -29,5 +31,5 @@ python3 skills/miniapp-dev/scripts/check_miniapp.py miniapps/eight-ball
 修改源码后可从 `mini-app` 目录重新打包。
 
 ```sh
-python3 -B skills/miniapp-dev/scripts/pack_miniapp.py miniapps/eight-ball -o market/zip/eight-ball-v1.zip
+python3 -B skills/miniapp-dev/scripts/pack_miniapp.py miniapps/eight-ball -o market/zip/eight-ball-v2.zip
 ```
