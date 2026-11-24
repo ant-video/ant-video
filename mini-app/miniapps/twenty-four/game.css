@@ -1,0 +1,39 @@
+:root {
+  color-scheme: dark;
+  --background: #211f36;
+  --topbar: #27223b;
+  --sheet: #302943;
+  --inset: #272139;
+  --control: #3f3555;
+  --line: #615475;
+  --text: #fff3ec;
+  --muted: #ded0e6;
+  --accent: #ffc49a;
+  --accent-text: #2e2030;
+  --strong: #ffd7ba;
+  --focus: #f7ae80;
+  --danger: #ffb8b0;
+  --hover: 1.10;
+  --heading: 'Songti SC', 'Noto Serif CJK SC', 'STSong', SimSun, serif;
+  --display: Georgia, 'Times New Roman', serif;
+}
+.workspace { background: #29233d; }
+.hand-wrap { border: 1px solid #8f6d90; border-radius: 11px; padding: 12px; background: #392e4c; }
+.number-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; margin-top: 9px; }
+.number-cards button { width: 100%; aspect-ratio: 0.88; max-height: 158px; color: #402747; background: #f9e1cb; border: 1px solid #f3cdbb; border-radius: 10px; font: 700 clamp(37px, 7vw, 68px)/1 var(--display); box-shadow: 0 4px 0 #aa7894, 0 7px 12px #19132688; padding: 0; }
+.number-cards button:nth-child(even) { color: #3b2d59; background: #e7d9f1; border-color: #e5ceee; box-shadow: 0 4px 0 #9273ae, 0 7px 12px #19132688; }
+.number-cards button.used { background: #594765; border-color: #776382; color: #ddcede; box-shadow: inset 0 0 0 1px #726080; }
+.number-cards button[aria-disabled='true'] { cursor: default; }
+.expression-work { margin-top: 15px; }
+.expression { min-height: 67px; display: flex; align-items: center; justify-content: center; padding: 8px; background: var(--inset); border: 1px solid var(--line); border-radius: 8px; font: 700 clamp(24px, 4vw, 38px)/1.15 var(--display); color: var(--strong); text-align: center; overflow-wrap: anywhere; }
+.expression.placeholder { font: 500 15px/1.35 -apple-system, BlinkMacSystemFont, sans-serif; color: var(--muted); }
+.operators { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 7px; margin: 10px 0; }
+.operators button { min-height: 45px; background: var(--control); border: 1px solid var(--line); color: var(--text); border-radius: 7px; font: 700 27px/1 var(--display); padding: 6px 1px; }
+.lobby-art span:nth-child(3) { color: #402747; background: #f9e1cb; }
+@media (max-width: 460px) {
+  .hand-wrap { padding: 8px; }
+  .number-cards { gap: 7px; }
+  .number-cards button { border-radius: 6px; }
+  .expression { min-height: 51px; }
+  .operators { gap: 5px; }
+}

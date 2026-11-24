@@ -1,0 +1,10 @@
+{
+  "appId": "com.leospring.gomoku",
+  "name": "落子五子棋",
+  "version": "1.1.0",
+  "versionCode": 2,
+  "renderer": "webview",
+  "entry": "index.html",
+  "description": "在 15 路棋盘上与好友联网约战、挑战三个难度的棋手，争夺段位积分。",
+  "permissions": ["cloud", "storage"]
+}

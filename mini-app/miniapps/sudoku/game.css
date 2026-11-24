@@ -1,0 +1,42 @@
+:root {
+  color-scheme: light;
+  --background: #f5f3e9;
+  --topbar: #fbf8ef;
+  --sheet: #fffdf5;
+  --inset: #eef0e3;
+  --control: #f3f1e6;
+  --line: #a9b2a0;
+  --text: #223e35;
+  --muted: #495f53;
+  --accent: #1f5748;
+  --accent-text: #fffdf3;
+  --strong: #1b5848;
+  --focus: #367b61;
+  --danger: #962a3b;
+  --hover: .94;
+  --heading: 'Songti SC', 'Noto Serif CJK SC', 'STSong', SimSun, serif;
+  --display: Georgia, 'Times New Roman', serif;
+}
+.primary:focus-visible, .tv-input .primary:focus { outline: 3px solid #316b96; outline-offset: 3px; }
+.brand-icon { font-style: normal; }
+.workspace { width: 100%; max-width: 605px; }
+@media (min-width: 721px) { .play-layout { grid-template-columns: minmax(0, clamp(340px, calc(100vh - 335px), 585px)) minmax(235px, 1fr); } }
+.sudoku-grid { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); margin: 7px 0 12px; border: 2px solid #4c6253; background: #fefcf3; border-radius: 3px; overflow: hidden; }
+.cell { min-width: 0; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-right: 1px solid #b9c0ad; border-bottom: 1px solid #b9c0ad; display: grid; place-items: center; color: #185c49; background: #fefdf5; font: 600 clamp(17px, 4.1vw, 29px)/1 var(--display); font-variant-numeric: tabular-nums; }
+.cell:nth-child(9n) { border-right-width: 0; }
+.cell:nth-child(n+73) { border-bottom-width: 0; }
+.cell.block-left { border-left: 2px solid #4c6253; }
+.cell.block-top { border-top: 2px solid #4c6253; }
+.cell.given { background: #efefe0; color: #273c32; font-weight: 750; }
+.cell.peer { background: #e4eee2; }
+.cell.same { background: #cfded0; }
+.cell.conflict { background: #f7d5d8; color: #962a3b; }
+.cell.selected { box-shadow: inset 0 0 0 2px #39765e; background: #cce5d5; }
+.cell.selected.conflict { background: #f4c6ca; }
+.cell:focus-visible, .tv-input .cell:focus { outline: 3px solid #27618a; outline-offset: -3px; position: relative; z-index: 1; }
+.cell-notes { width: 100%; height: 100%; padding: 8%; display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); color: #465e54; font: 500 clamp(8px, 1.65vw, 12px)/1 -apple-system, BlinkMacSystemFont, sans-serif; }
+.cell-notes span { display: grid; place-items: center; }
+.keypad { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 4px; margin-bottom: 9px; }
+.keypad button { border: 1px solid var(--line); border-radius: 6px; background: var(--inset); color: var(--text); min-height: 38px; padding: 0; font: 700 21px/1 var(--display); }
+#conflict-count { color: var(--danger); }
+.lobby-art span:nth-child(2) { color: var(--accent-text); background: var(--accent); }

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#192b27">
+  <title>落子五子棋</title>
+  <link rel="stylesheet" href="./style.css">
+  <script defer src="./engine.js"></script>
+  <script defer src="./online.js"></script>
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#practice" aria-label="落子五子棋首页">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span>落子<span class="brand-detail">五子棋</span></span>
+      </a>
+      <nav class="nav" aria-label="游戏模式">
+        <a href="#practice" data-view="practice">人机对弈</a>
+        <a href="#online" data-view="online">联网对战</a>
+        <a href="#ranking" data-view="ranking">段位榜</a>
+      </nav>
+      <button id="audio-open" class="icon-button" type="button" aria-label="声音设置" title="声音设置"><span class="audio-icon" aria-hidden="true">♫</span></button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section id="play-view" aria-labelledby="play-title">
+      <div class="page-heading">
+        <div><h1 id="play-title">人机对弈</h1><p id="play-description">15 路棋盘，率先连成五子获胜。</p></div>
+        <div class="heading-actions">
+          <span id="rules-chip" class="pill"><span class="pill-dot"></span>自由规则</span>
+          <button id="share" class="quiet-button" type="button" hidden>复制房间码</button>
+        </div>
+      </div>
+
+      <div class="game-layout">
+        <section class="board-stage" aria-label="五子棋棋盘">
+          <div class="board-frame">
+            <div class="board-coordinates cols top" aria-hidden="true"></div>
+            <div class="board-coordinates rows left" aria-hidden="true"></div>
+            <div id="board" class="board" role="group" aria-label="15 路棋盘，使用方向键移动，回车落子"></div>
+            <div class="board-coordinates rows right" aria-hidden="true"></div>
+            <div class="board-coordinates cols bottom" aria-hidden="true"></div>
+          </div>
+          <div class="board-caption"><span id="move-count">第 0 手</span><span id="last-move">落子位置 —</span></div>
+        </section>
+
+        <aside class="players-panel" aria-label="对局状态">
+          <div class="panel-heading"><h2>棋局</h2><span id="clock" class="clock" hidden></span></div>
+          <div class="seats">
+            <div id="seat-1" class="seat">
+              <span class="piece black" aria-hidden="true"></span>
+              <div><strong id="name-1">你</strong><small id="detail-1">执黑 · 先手</small></div>
+              <span id="turn-1" class="turn-indicator" hidden>落子</span>
+            </div>
+            <div id="seat-2" class="seat">
+              <span class="piece white" aria-hidden="true"></span>
+              <div><strong id="name-2">棋手</strong><small id="detail-2">执白 · 后手</small></div>
+              <span id="turn-2" class="turn-indicator" hidden>落子</span>
+            </div>
+          </div>
+          <div id="game-status" class="game-status" role="status" aria-live="polite">
+            <strong id="status-title">轮到你了</strong><span id="status-detail">选择棋盘上的交叉点落子</span>
+          </div>
+        </aside>
+
+        <aside id="practice-panel" class="controls-panel" aria-label="人机设置">
+          <div class="control-row"><span id="difficulty-label">棋手难度</span>
+            <div class="choices" role="group" aria-labelledby="difficulty-label">
+              <button type="button" data-difficulty="easy">入门</button>
+              <button type="button" data-difficulty="normal">进阶</button>
+              <button type="button" data-difficulty="hard">大师</button>
+            </div>
+          </div>
+          <div class="control-row"><span id="side-label">执子</span>
+            <div class="choices sides" role="group" aria-labelledby="side-label">
+              <button type="button" data-side="1"><span class="piece black" aria-hidden="true"></span>执黑</button>
+              <button type="button" data-side="2"><span class="piece white" aria-hidden="true"></span>执白</button>
+            </div>
+          </div>
+          <div class="panel-actions">
+            <button id="new-game" class="primary" type="button">重新开局</button>
+            <button id="undo" class="secondary" type="button" disabled>悔棋</button>
+          </div>
+        </aside>
+
+        <aside id="online-panel" class="controls-panel online-controls" aria-label="联网操作" hidden>
+          <div class="control-row"><span>网络</span><span id="connection" class="connection"><span class="pill-dot"></span><span>已连接</span></span></div>
+          <div class="panel-actions">
+            <button id="leave-room" class="secondary" type="button">认输</button>
+            <button id="return-lobby" class="primary" type="button">返回大厅</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="lobby-view" hidden aria-labelledby="lobby-title">
+      <div class="page-heading"><div><h1 id="lobby-title">联网对战</h1><p>分享房间码，邀请好友对弈。</p></div></div>
+      <div class="lobby-layout">
+        <section class="scene-panel">
+          <div class="online-art" aria-hidden="true"><span class="piece black"></span><span class="piece white"></span></div>
+          <div class="scene-content"><h2>好友约战</h2><p>每步限时 90 秒，双方落子后计入段位。</p><button id="create-room" class="primary" type="button">创建房间</button></div>
+        </section>
+        <div class="lobby-side">
+          <section class="box"><h2>加入房间</h2>
+            <form id="join-form" class="join-form">
+              <label class="sr-only" for="join-code">好友房间码</label>
+              <input id="join-code" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="36" placeholder="粘贴房间码" required>
+              <button class="primary" type="submit">加入</button>
+            </form>
+          </section>
+          <section class="box profile-box"><h2>棋手资料</h2>
+            <form id="profile-form" class="join-form">
+              <label class="sr-only" for="nickname">昵称</label>
+              <input id="nickname" type="text" autocomplete="off" maxlength="16" placeholder="棋手昵称" required>
+              <button class="secondary" type="submit">保存</button>
+            </form>
+            <p id="lobby-rating"></p>
+          </section>
+        </div>
+      </div>
+      <div id="lobby-feedback" class="feedback" role="status" aria-live="polite" hidden><span id="lobby-message"></span><button id="retry-lobby" class="quiet-button" type="button">重试</button></div>
+    </section>
+
+    <section id="ranking-view" hidden aria-labelledby="ranking-title">
+      <div class="page-heading"><div><h1 id="ranking-title">段位排行榜</h1><p>好友对战积分前 50 名</p></div><button id="reload-ranking" class="quiet-button" type="button">刷新</button></div>
+      <section id="self-ranking" class="self-ranking" aria-label="我的段位" hidden>
+        <div><small>我的段位</small><strong id="self-tier"></strong></div>
+        <div><small>积分</small><strong id="self-rating"></strong></div>
+        <div><small>排名</small><strong id="self-position"></strong></div>
+        <div><small>胜率</small><strong id="self-rate"></strong></div>
+      </section>
+      <div class="ranking-panel">
+        <table id="ranking-table" hidden>
+          <thead><tr><th scope="col">名次</th><th scope="col">棋手</th><th scope="col">段位</th><th scope="col">积分</th><th class="table-optional" scope="col">对局</th><th class="table-optional" scope="col">胜率</th></tr></thead>
+          <tbody id="ranking-rows"></tbody>
+        </table>
+        <p id="ranking-message" class="empty-state" role="status">正在读取排行榜…</p>
+      </div>
+      <details class="rank-guide"><summary>段位规则</summary><p>初始积分为 1000。双方都落子后，胜方加 30 分，负方加 3 分，平局各加 10 分。好友积分由客户端结算。</p>
+        <div class="rank-tiers"><span>青铜 &lt; 1100</span><span>白银 1100</span><span>黄金 1250</span><span>铂金 1450</span><span>大师 1700</span></div>
+      </details>
+    </section>
+  </main>
+
+  <div id="modal" class="modal" hidden>
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-heading"><h2 id="modal-title"></h2><button id="modal-close" class="icon-button" type="button" aria-label="关闭">×</button></div>
+      <div id="audio-settings" hidden>
+        <label class="sound-row">背景音乐 <input id="music-enabled" type="checkbox" role="switch"></label>
+        <label class="sound-row">落子与结算音效 <input id="effects-enabled" type="checkbox" role="switch"></label>
+      </div>
+      <div id="confirmation" hidden><p id="confirmation-copy"></p><div class="panel-actions"><button id="confirm-no" class="secondary" type="button">取消</button><button id="confirm-yes" class="primary" type="button"></button></div></div>
+    </section>
+  </div>
+  <div id="notice" class="notice" role="status" hidden></div>
+  <audio id="music" src="./audio/mountain.m4a" loop preload="none"></audio>
+</body>
+</html>

@@ -5,7 +5,7 @@
 小程序界面是 HTML/JS/CSS，跑在宿主 WebView 里，通过 document-start 注入的 `window.ant`
 调用播放器、采集源、存储等能力；包内也能携带 Python 或 Node.js 后端。使用已支持这些能力的
 宿主无需修改 Flutter 或重新编译。Python 的函数/HTTP 服务契约见 [Python 参考](skills/miniapp-dev/references/python.md)。
-SDK 9 还提供云配置/文件、全网排行榜、多人房间及服务端业务云函数，见 [联网开发参考](skills/miniapp-dev/references/cloud.md)。
+SDK 8 提供云配置/文件、全网排行榜和多人房间，SDK 9 增加服务端业务云函数，见 [联网开发参考](skills/miniapp-dev/references/cloud.md)。
 
 ## 目录结构
 
@@ -27,6 +27,11 @@ mini-app/
 │  ├─ python-demo/                 Python 顶层函数调用与 HTTP 服务
 │  ├─ sudugu-reader/               速读谷 Python 小说阅读器
 │  ├─ draw-guess/                  画猜俱乐部（多人你画我猜 + 服务端积分榜）
+│  ├─ gomoku/                      落子五子棋（好友对弈 + 人机练习）
+│  ├─ twenty-four/                 24点对决（好友五题连赛）
+│  ├─ sudoku/                      数独竞速（好友同题竞速）
+│  ├─ xiangqi/                     楚河象棋（好友对弈 + 人机练习）
+│  ├─ eight-ball/                  黑八球房（好友联网 + 本地双人）
 │  ├─ tetris/                      俄罗斯方块（纯前端游戏 + TV 遥控）
 │  └─ emby/                        影视库（多页面 + 采集源 + 播放 + 续播）
 ├─ market/
@@ -51,6 +56,11 @@ mini-app/
 | **[速读谷小说](miniapps/sudugu-reader/README.md)** | `com.leospring.sudugu_reader` | python / ui / storage | 基于附件 Python 采集脚本：分类/搜索/简介/目录、分页正文、书架、阅读进度、字号/行距/夜间配色、TV 遥控 |
 | **LogVar 弹幕服务（Node 版）** `miniapps/logvar-danmu-node/` | `com.logvar.danmu.node` | node | 真实的 Node 服务小程序：把上游 danmu_api 打成单个 CJS bundle 跑在宿主内嵌 node 里。目录内是宿主适配层与构建脚本，业务源码来自上游 checkout（AGPL-3.0） |
 | **[画猜俱乐部](miniapps/draw-guess/README.md)** | `com.leospring.drawguess` | cloud / storage / ui / navigate | 2–8 人实时你画我猜，选词作画、猜词计分、重进恢复及全网累计积分榜；需要提供画猜联网能力的 SDK 9 宿主 |
+| **[落子五子棋](miniapps/gomoku/README.md)** | `com.leospring.gomoku` | cloud / storage | 离线三档人机、好友房、段位榜和背景音乐 |
+| **[24点对决](miniapps/twenty-four/README.md)** | `com.leospring.twentyfour` | cloud / storage | 双人五题连赛、离线练习与解法 |
+| **[数独竞速](miniapps/sudoku/README.md)** | `com.leospring.sudoku` | cloud / storage | 三档唯一解、笔记、同题竞速和续局 |
+| **[楚河象棋](miniapps/xiangqi/README.md)** | `com.leospring.xiangqi` | cloud / storage | 合法落点、离线人机、好友对弈与自动翻盘 |
+| **[黑八球房](miniapps/eight-ball/README.md)** | `com.leospring.eightball` | cloud / storage | 本地双人、联网击球回放、犯规与黑八指定袋口 |
 | **俄罗斯方块** `miniapps/tetris/` | `com.leospring.tetris` | ui / storage / navigate | 掌机复刻，Web Audio 音效 + LCD 光影；自带 `ant-mock.js`，浏览器里直接能玩 |
 | **影视库** `miniapps/emby/` | `com.leospring.emby` | ui / storage / navigate / player / source | Emby 风格四页面（首页 / 媒体库 / 搜索 / 详情），复用宿主已配置的采集源，续播记录存 `ant.storage` |
 
@@ -229,6 +239,18 @@ manifest 声明 `cloud` 后，宿主统一提供联网服务和玩家身份，
 
 [源码与玩法](miniapps/draw-guess/README.md)。游戏直接使用宿主提供的联网能力，
 开发与安装无需另行部署服务。
+
+### 好友对战小游戏
+
+以下小程序都支持房间码邀请、断线续局、独立好友榜和电视遥控器。联网时使用已开通小程序联网能力的 SDK 8 或更高版本宿主，两端安装同一个小程序即可约战。
+
+| 小程序 | 安装包 |
+|---|---|
+| 落子五子棋 | [gomoku-v2.zip](market/zip/gomoku-v2.zip) |
+| 24点对决 | [twenty-four-v1.zip](market/zip/twenty-four-v1.zip) |
+| 数独竞速 | [sudoku-v1.zip](market/zip/sudoku-v1.zip) |
+| 楚河象棋 | [xiangqi-v1.zip](market/zip/xiangqi-v1.zip) |
+| 黑八球房 | [eight-ball-v1.zip](market/zip/eight-ball-v1.zip) |
 
 ## Python 示例与小说阅读器
 

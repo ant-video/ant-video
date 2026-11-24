@@ -1,0 +1,10 @@
+{
+  "appId": "com.leospring.twentyfour",
+  "name": "24点对决",
+  "version": "1.0.0",
+  "versionCode": 1,
+  "renderer": "webview",
+  "entry": "index.html",
+  "description": "用四张数字牌算出 24，离线练习或和好友进行五题连赛。",
+  "permissions": ["storage", "cloud"]
+}

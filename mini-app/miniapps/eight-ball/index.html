@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#172623">
+  <title>黑八球房</title>
+  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./game.css">
+  <script defer src="./pool.js"></script>
+  <script defer src="./cloud.js"></script>
+  <script defer src="./game.js"></script>
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="nav-shell">
+      <a class="brand" href="#local"><span class="brand-icon" aria-hidden="true">8</span>黑八球房</a>
+      <nav aria-label="游戏模式">
+        <a href="#local" data-view="local" id="local-tab">本地双人</a>
+        <a href="#online" data-view="online">好友对战</a>
+        <a href="#ranking" data-view="ranking">胜场榜</a>
+      </nav>
+    </div>
+  </header>
+  <main class="shell">
+    <section id="play-view" aria-labelledby="play-title">
+      <header class="page-title">
+        <div><h1 id="play-title">本地双人</h1><p id="play-description">轮流瞄准、调整力度并击球，清完自己的球组再打黑八。</p></div>
+
+      </header>
+      <div class="play-layout">
+        <section id="workspace" class="workspace" aria-label="解题区" hidden>
+          <div class="table-frame">
+            <canvas id="pool-table" width="1082" height="582" tabindex="0" aria-label="台球桌，左右键微调瞄准，确认键击球或摆球"></canvas>
+          </div>
+          <div class="editor-head"><span id="ball-hint"></span><span id="strength-value">100%</span></div>
+          <div class="pool-controls">
+            <div class="aim-buttons" role="group" aria-label="瞄准微调">
+              <button id="aim-left" class="secondary" type="button" aria-label="向左微调">↶</button>
+              <button id="aim-right" class="secondary" type="button" aria-label="向右微调">↷</button>
+            </div>
+            <label class="force-control">力度 <input id="strength" type="range" min="4" max="100" step="1" value="100"></label>
+            <button id="place-mode" class="secondary" type="button" hidden>确认摆球</button>
+            <button id="strike" class="primary" type="button">击球</button>
+          </div>
+          <div id="pocket-row" class="pocket-row" hidden aria-label="指定黑八袋口">
+            <span>黑八袋口</span><div class="pocket-buttons"><button type="button" class="secondary" data-pocket="0" aria-pressed="false"></button><button type="button" class="secondary" data-pocket="1" aria-pressed="false"></button><button type="button" class="secondary" data-pocket="2" aria-pressed="false"></button><button type="button" class="secondary" data-pocket="3" aria-pressed="false"></button><button type="button" class="secondary" data-pocket="4" aria-pressed="false"></button><button type="button" class="secondary" data-pocket="5" aria-pressed="false"></button></div>
+          </div>
+          <div class="editor-head groups"><span>先手 <b id="group-0"></b></span><span>后手 <b id="group-1"></b></span></div>
+          <p id="editor-message" class="editor-message" role="status" aria-live="polite"></p>
+        </section>
+        <section id="waiting-card" class="waiting-card" aria-labelledby="waiting-title" hidden>
+          <h2 id="waiting-title">等待好友加入</h2>
+          <p>复制房间码发给好友，对方加入后自动开局。</p>
+          <output id="invite-code" aria-label="房间码"></output>
+          <button id="copy-code" class="primary" type="button">复制房间码</button>
+        </section>
+        <aside class="side-panel" aria-label="题目状态">
+          <section class="side-card" id="game-summary">
+            <div class="summary-head"><h2 id="summary-heading">对局状态</h2><time id="clock" class="clock"></time></div>
+            <div id="versus" class="versus" hidden>
+              <div><strong id="left-player"></strong><span id="left-result"></span></div>
+              <div><strong id="right-player"></strong><span id="right-result"></span></div>
+            </div>
+            <div id="game-status" class="game-status" role="status" aria-live="polite">
+              <strong id="status-title"></strong><span id="status-detail"></span>
+            </div>
+          </section>
+          <section id="local-options" class="side-card side-options" aria-label="本地对局选项">
+            <button id="new-local" class="primary" type="button">重新开局</button>
+            <button id="undo-local" class="secondary" type="button" hidden>悔棋</button>
+          </section>
+          <section id="room-options" class="side-card side-options" aria-label="房间选项" hidden>
+            <div class="field-row"><span>房间连接</span><strong id="connection">已连接</strong></div>
+
+            <button id="return-lobby" class="primary" type="button" hidden>返回大厅</button>
+            <button id="close-room" class="secondary" type="button">结束对战</button>
+          </section>
+        </aside>
+      </div>
+    </section>
+    <section id="lobby-view" aria-labelledby="lobby-title" hidden>
+      <header class="page-title"><div><h1 id="lobby-title">好友对战</h1><p id="lobby-description"></p></div></header>
+      <div class="lobby-layout">
+        <section class="create-card">
+          <div class="lobby-art" aria-hidden="true"><span>6</span><span>4</span><span>8</span></div>
+          <h2>创建好友房</h2>
+
+          <button id="create-room" class="primary" type="button">创建房间</button>
+        </section>
+        <div class="lobby-side">
+          <section class="side-card">
+            <h2>加入房间</h2>
+            <form id="join-form" class="inline-form">
+              <input id="join-code" aria-label="好友房间码" type="text" maxlength="36" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="粘贴房间码" required>
+              <button class="primary" type="submit">加入</button>
+            </form>
+          </section>
+          <section class="side-card">
+            <h2>我的昵称</h2>
+            <form id="profile-form" class="inline-form">
+              <input id="nickname" aria-label="我的昵称" type="text" maxlength="16" autocomplete="off" placeholder="设置昵称" required>
+              <button class="secondary" type="submit">保存</button>
+            </form>
+          </section>
+        </div>
+      </div>
+      <p id="lobby-message" class="message" role="status" hidden></p>
+    </section>
+    <section id="rank-view" aria-labelledby="rank-title" hidden>
+      <header class="page-title">
+        <div><h1 id="rank-title">好友胜场榜</h1><p>前 50 名，按赢下的对局数排名。</p></div>
+        <button id="reload-rank" class="secondary" type="button">刷新</button>
+      </header>
+      <p id="rank-self" class="rank-self" hidden></p>
+      <div class="rank-card">
+        <table id="rank-table" hidden><thead><tr><th scope="col">名次</th><th scope="col">玩家</th><th scope="col">胜场</th></tr></thead><tbody id="rank-rows"></tbody></table>
+        <p id="rank-message" class="rank-empty" role="status">正在读取榜单…</p>
+      </div>
+      <p class="rank-note">好友胜场由客户端结算。</p>
+    </section>
+  </main>
+  <div id="confirm" class="dialog-scrim" hidden>
+    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <h2 id="confirm-title">结束对战</h2><p>房间将结束。双方都行动过时，对手会获得一场胜利。</p>
+      <div class="actions"><button id="cancel-close" class="secondary" type="button">继续对战</button><button id="confirm-close" class="primary" type="button">结束对战</button></div>
+    </section>
+  </div>
+  <div id="notice" class="notice" role="status" hidden></div>
+</body>
+</html>

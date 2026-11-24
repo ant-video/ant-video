@@ -1,0 +1,10 @@
+{
+  "appId": "com.leospring.sudoku",
+  "name": "数独竞速",
+  "version": "1.0.0",
+  "versionCode": 1,
+  "renderer": "webview",
+  "entry": "index.html",
+  "description": "练习标准九宫格数独，或与好友同题竞速。支持笔记、撤销和续局。",
+  "permissions": ["storage", "cloud"]
+}

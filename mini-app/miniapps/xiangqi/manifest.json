@@ -1,0 +1,10 @@
+{
+  "appId": "com.leospring.xiangqi",
+  "name": "楚河象棋",
+  "version": "1.0.0",
+  "versionCode": 1,
+  "renderer": "webview",
+  "entry": "index.html",
+  "description": "中国象棋好友对弈，支持离线人机、续局和好友胜场榜。",
+  "permissions": ["storage", "cloud"]
+}

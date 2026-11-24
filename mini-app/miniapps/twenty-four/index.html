@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#211f36">
+  <title>24点对决</title>
+  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./game.css">
+  <script defer src="./engine.js"></script>
+  <script defer src="./cloud.js"></script>
+  <script defer src="./game.js"></script>
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="nav-shell">
+      <a class="brand" href="#practice"><span class="brand-icon" aria-hidden="true">24</span>24点对决</a>
+      <nav aria-label="游戏模式">
+        <a href="#practice" data-view="practice">离线练习</a>
+        <a href="#online" data-view="online">好友对战</a>
+        <a href="#ranking" data-view="ranking">胜场榜</a>
+      </nav>
+    </div>
+  </header>
+  <main class="shell">
+    <section id="play-view" aria-labelledby="play-title">
+      <header class="page-title">
+        <div><h1 id="play-title">离线练习</h1><p id="play-description">四张牌各用一次，用加减乘除算出 24。</p></div>
+        <span id="round-number" class="game-count" hidden></span>
+      </header>
+      <div class="play-layout">
+        <section id="workspace" class="workspace" aria-label="解题区" hidden>
+          <div class="hand-wrap">
+            <div class="editor-head"><h2>数字牌</h2><span id="used-count"></span></div>
+            <div class="number-cards" role="group" aria-label="四张数字牌">
+              <button type="button" data-card="0"></button><button type="button" data-card="1"></button>
+              <button type="button" data-card="2"></button><button type="button" data-card="3"></button>
+            </div>
+          </div>
+          <div class="expression-work">
+            <div id="expression" class="expression" aria-label="当前算式"></div>
+            <div class="operators" role="group" aria-label="运算符">
+              <button type="button" data-token="+" aria-label="加">+</button><button type="button" data-token="-" aria-label="减">−</button>
+              <button type="button" data-token="*" aria-label="乘">×</button><button type="button" data-token="/" aria-label="除">÷</button>
+              <button type="button" data-token="(" aria-label="左括号">(</button><button type="button" data-token=")" aria-label="右括号">)</button>
+            </div>
+            <div class="actions"><button id="undo" class="secondary" type="button">撤销</button><button id="erase" class="secondary" type="button">清空</button><button id="submit" class="primary" type="button">提交算式</button></div>
+          </div>
+          <p id="editor-message" class="editor-message" role="status" aria-live="polite"></p>
+        </section>
+        <section id="waiting-card" class="waiting-card" aria-labelledby="waiting-title" hidden>
+          <h2 id="waiting-title">等待好友加入</h2>
+          <p>复制房间码发给好友，对方加入后自动开局。</p>
+          <output id="invite-code" aria-label="房间码"></output>
+          <button id="copy-code" class="primary" type="button">复制房间码</button>
+        </section>
+        <aside class="side-panel" aria-label="题目状态">
+          <section class="side-card" id="game-summary">
+            <div class="summary-head"><h2 id="summary-heading">练习</h2><time id="clock" class="clock"></time></div>
+            <div id="versus" class="versus" hidden>
+              <div><strong id="left-player"></strong><span id="left-result"></span></div>
+              <div><strong id="right-player"></strong><span id="right-result"></span></div>
+            </div>
+            <div id="game-status" class="game-status" role="status" aria-live="polite">
+              <strong id="status-title"></strong><span id="status-detail"></span>
+            </div>
+          </section>
+          <section id="practice-options" class="side-card side-options" aria-label="练习选项">
+            <label id="practice-level-row" class="field-row" hidden>难度 <select id="practice-level"></select></label>
+            <button id="new-puzzle" class="primary" type="button">换一题</button>
+            <button id="hint" class="secondary" type="button">查看解法</button>
+          </section>
+          <section id="room-options" class="side-card side-options" aria-label="房间选项" hidden>
+            <div class="field-row"><span>房间连接</span><strong id="connection">已连接</strong></div>
+            <button id="next-round" class="primary" type="button" hidden>下一题</button>
+            <button id="return-lobby" class="primary" type="button" hidden>返回大厅</button>
+            <button id="close-room" class="secondary" type="button">结束对战</button>
+          </section>
+        </aside>
+      </div>
+    </section>
+    <section id="lobby-view" aria-labelledby="lobby-title" hidden>
+      <header class="page-title"><div><h1 id="lobby-title">好友对战</h1><p id="lobby-description"></p></div></header>
+      <div class="lobby-layout">
+        <section class="create-card">
+          <div class="lobby-art" aria-hidden="true"><span>6</span><span>4</span><span>24</span></div>
+          <h2>创建好友房</h2>
+          <label id="room-level-row" class="field-row" hidden>难度 <select id="room-level"></select></label>
+          <button id="create-room" class="primary" type="button">创建房间</button>
+        </section>
+        <div class="lobby-side">
+          <section class="side-card">
+            <h2>加入房间</h2>
+            <form id="join-form" class="inline-form">
+              <input id="join-code" aria-label="好友房间码" type="text" maxlength="36" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="粘贴房间码" required>
+              <button class="primary" type="submit">加入</button>
+            </form>
+          </section>
+          <section class="side-card">
+            <h2>我的昵称</h2>
+            <form id="profile-form" class="inline-form">
+              <input id="nickname" aria-label="我的昵称" type="text" maxlength="16" autocomplete="off" placeholder="设置昵称" required>
+              <button class="secondary" type="submit">保存</button>
+            </form>
+          </section>
+        </div>
+      </div>
+      <p id="lobby-message" class="message" role="status" hidden></p>
+    </section>
+    <section id="rank-view" aria-labelledby="rank-title" hidden>
+      <header class="page-title">
+        <div><h1 id="rank-title">好友胜场榜</h1><p>前 50 名，按赢下的对局数排名。</p></div>
+        <button id="reload-rank" class="secondary" type="button">刷新</button>
+      </header>
+      <p id="rank-self" class="rank-self" hidden></p>
+      <div class="rank-card">
+        <table id="rank-table" hidden><thead><tr><th scope="col">名次</th><th scope="col">玩家</th><th scope="col">胜场</th></tr></thead><tbody id="rank-rows"></tbody></table>
+        <p id="rank-message" class="rank-empty" role="status">正在读取榜单…</p>
+      </div>
+      <p class="rank-note">好友胜场由客户端结算。</p>
+    </section>
+  </main>
+  <div id="confirm" class="dialog-scrim" hidden>
+    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <h2 id="confirm-title">结束对战</h2><p>双方都会退出本场比赛，本场将不计入胜场。</p>
+      <div class="actions"><button id="cancel-close" class="secondary" type="button">继续对战</button><button id="confirm-close" class="primary" type="button">结束对战</button></div>
+    </section>
+  </div>
+  <div id="notice" class="notice" role="status" hidden></div>
+</body>
+</html>
